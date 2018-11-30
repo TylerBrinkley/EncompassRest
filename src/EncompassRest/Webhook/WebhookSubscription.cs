@@ -8,12 +8,13 @@ using Newtonsoft.Json;
 
 namespace EncompassRest.Webhook
 {
+    [Entity(PropertiesToAlwaysSerialize = nameof(Events))]
     public sealed class WebhookSubscription : DirtyExtensibleObject, IIdentifiable
     {
         private string _endpoint;
         private string _subscriptionId;
         private StringEnumValue<WebhookResourceType> _resource;
-        private List<StringEnumValue<WebhookResourceEvent>> _events;
+        private DirtyList<StringEnumValue<WebhookResourceEvent>> _events;
         private WebhookFilters _filters;
         private NeverSerializeValue<string> _objectUrn;
         private NeverSerializeValue<string> _clientId;
@@ -28,7 +29,7 @@ namespace EncompassRest.Webhook
         public StringEnumValue<WebhookResourceType> Resource { get => _resource; set => SetField(ref _resource, value); }
 
         [JsonRequired]
-        public IList<StringEnumValue<WebhookResourceEvent>> Events { get => GetField(ref _events); set => SetField(ref _events, value?.ToList()); }
+        public IList<StringEnumValue<WebhookResourceEvent>> Events { get => GetField(ref _events); set => SetField(ref _events, value); }
 
         public WebhookFilters Filters { get => GetField(ref _filters); set => SetField(ref _filters, value); }
 
@@ -64,7 +65,7 @@ namespace EncompassRest.Webhook
 
             Endpoint = endpoint;
             Resource = resource;
-            _events = events.Select(e => new StringEnumValue<WebhookResourceEvent>(e)).ToList();
+            _events = new DirtyList<StringEnumValue<WebhookResourceEvent>>(events.Select(e => new StringEnumValue<WebhookResourceEvent>(e)));
         }
     }
 }

@@ -62,6 +62,38 @@ namespace EncompassRest.Loans
             }
         }
 
+        private event EventHandler<FieldChangeEventArgs> _fieldChange;
+
+        public event EventHandler<FieldChangeEventArgs> FieldChange
+        {
+            add
+            {
+                _fieldChange += value;
+                if (IncrementListeners(true) == 0)
+                {
+                    AttributeChanged += Loan_AttributeChanged;
+                }
+            }
+            remove
+            {
+                if (_fieldChange != null)
+                {
+                    _fieldChange -= value;
+                    if (IncrementListeners(false) == 1)
+                    {
+                        AttributeChanged -= Loan_AttributeChanged;
+                    }
+                }
+            }
+        }
+
+        private void Loan_AttributeChanged(object sender, AttributeChangedEventArgs e)
+        {
+            e.Path.Push("Loan");
+            var modelPath = string.Join(".", e.Path);
+            _fieldChange?.Invoke(this, new FieldChangeEventArgs(modelPath, e.PriorValue, e.NewValue));
+        }
+
         /// <summary>
         /// Loan update constructor
         /// </summary>
@@ -112,9 +144,9 @@ namespace EncompassRest.Loans
             }
         }
 
-        internal override void OnPropertyChanged(string propertyName)
+        internal override void OnPropertyChanged(string propertyName, object priorValue, object newValue)
         {
-            base.OnPropertyChanged(propertyName);
+            base.OnPropertyChanged(propertyName, priorValue, newValue);
             switch (propertyName)
             {
                 case nameof(CurrentApplicationIndex):

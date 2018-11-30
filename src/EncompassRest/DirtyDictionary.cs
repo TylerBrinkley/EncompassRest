@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using EncompassRest.Utilities;
 using Newtonsoft.Json;
@@ -8,20 +9,40 @@ using Newtonsoft.Json;
 namespace EncompassRest
 {
     [JsonConverter(typeof(DirtyDictionaryConverter<,>))]
-    internal sealed class DirtyDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>, IDictionary, IDirty
+    internal sealed class DirtyDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>, IDirtyDictionary
     {
         internal readonly Dictionary<TKey, DirtyValue<TValue>> _dictionary;
         private ValueCollection _values;
 
-        public TValue this[TKey key] { get => _dictionary[key]; set => _dictionary[key] = value; }
+        public TValue this[TKey key]
+        {
+            get => _dictionary[key];
+            set
+            {
+                var found = false;
+                TValue existing = default;
+                var hasHandler = CollectionChanged != null;
+                if (hasHandler)
+                {
+                    found = _dictionary.TryGetValue(key, out var existingDirtyValue);
+                    if (found)
+                    {
+                        existing = existingDirtyValue._value;
+                    }
+                }
+                _dictionary[key] = value;
+                if (hasHandler)
+                {
+                    CollectionChanged?.Invoke(this, found ? new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, KeyValuePair.Create(key, value), KeyValuePair.Create(key, existing)) : new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, KeyValuePair.Create(key, value)));
+                }
+            }
+        }
 
         public ICollection<TKey> Keys => _dictionary.Keys;
 
         public ICollection<TValue> Values => _values ?? (_values = new ValueCollection(this));
 
         public int Count => _dictionary.Count;
-
-        public bool IsReadOnly => false;
 
         public bool Dirty
         {
@@ -35,17 +56,21 @@ namespace EncompassRest
             }
         }
 
+        public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+        bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly => false;
+
         IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
 
         IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
+
+        bool IDictionary.IsReadOnly => false;
 
         bool IDictionary.IsFixedSize => false;
 
         ICollection IDictionary.Keys => _dictionary.Keys;
 
         ICollection IDictionary.Values => (ICollection)Values;
-
-        int ICollection.Count => Count;
 
         bool ICollection.IsSynchronized => ((ICollection)_dictionary).IsSynchronized;
 
@@ -54,43 +79,90 @@ namespace EncompassRest
         object IDictionary.this[object key] { get => this[ValidateKey(key)]; set => this[ValidateKey(key)] = ValidateValue(value); }
 
         public DirtyDictionary()
-            : this((IEqualityComparer<TKey>)null)
+            : this(0, null)
+        {
+        }
+
+        public DirtyDictionary(int capacity)
+            : this(capacity, null)
         {
         }
 
         public DirtyDictionary(IEqualityComparer<TKey> comparer)
-        {
-            _dictionary = new Dictionary<TKey, DirtyValue<TValue>>(comparer);
-        }
-
-        public DirtyDictionary(IDictionary<TKey, TValue> dictionary)
-            : this(dictionary, null)
+            : this(0, comparer)
         {
         }
 
-        public DirtyDictionary(IDictionary<TKey, TValue> dictionary, IEqualityComparer<TKey> comparer)
-            : this(comparer)
+        public DirtyDictionary(int capacity, IEqualityComparer<TKey> comparer)
         {
-            if (dictionary != null)
+            _dictionary = new Dictionary<TKey, DirtyValue<TValue>>(capacity, comparer);
+        }
+
+        public DirtyDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection)
+            : this(collection, null)
+        {
+        }
+
+        public DirtyDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer)
+            : this((collection as ICollection<KeyValuePair<TKey, TValue>>)?.Count ?? 0, comparer)
+        {
+            foreach (var pair in collection)
             {
-                foreach (var pair in dictionary)
-                {
-                    Add(pair);
-                }
+                Add(pair.Key, pair.Value);
             }
         }
 
-        public void Add(TKey key, TValue value) => _dictionary.Add(key, value);
+        public void Add(TKey key, TValue value)
+        {
+            _dictionary.Add(key, value);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, KeyValuePair.Create(key, value)));
+        }
 
-        public void Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
-
-        public void Clear() => _dictionary.Clear();
-
-        public bool Contains(KeyValuePair<TKey, TValue> item) => _dictionary.TryGetValue(item.Key, out var value) && EqualityComparer<TValue>.Default.Equals(item.Value, value);
+        public void Clear()
+        {
+            _dictionary.Clear();
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
 
-        public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+        public Enumerator GetEnumerator() => new Enumerator(this, false);
+
+        public bool Remove(TKey key)
+        {
+            TValue value = default;
+            var hasHandler = CollectionChanged != null;
+            if (hasHandler)
+            {
+                if (_dictionary.TryGetValue(key, out var dirtyValue))
+                {
+                    value = dirtyValue._value;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            var success = _dictionary.Remove(key);
+            if (success && hasHandler)
+            {
+                CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, KeyValuePair.Create(key, value)));
+            }
+            return success;
+        }
+
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            var success = _dictionary.TryGetValue(key, out var dirtyValue);
+            value = success ? dirtyValue._value : default;
+            return success;
+        }
+
+        void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
+
+        bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) => _dictionary.TryGetValue(item.Key, out var value) && EqualityComparer<TValue>.Default.Equals(item.Value, value);
+
+        void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
         {
             Preconditions.NotNull(array, nameof(array));
             Preconditions.LessThan(arrayIndex, nameof(arrayIndex), array.Length, $"{nameof(array)}.Length");
@@ -104,18 +176,7 @@ namespace EncompassRest
             }
         }
 
-        public Enumerator GetEnumerator() => new Enumerator(this, false);
-
-        public bool Remove(TKey key) => _dictionary.Remove(key);
-
-        public bool Remove(KeyValuePair<TKey, TValue> item) => Contains(item) && Remove(item.Key);
-
-        public bool TryGetValue(TKey key, out TValue value)
-        {
-            var success = _dictionary.TryGetValue(key, out var dirtyValue);
-            value = success ? dirtyValue._value : default;
-            return success;
-        }
+        bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)this).Contains(item) && Remove(item.Key);
 
         IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => GetEnumerator();
 
@@ -171,24 +232,32 @@ namespace EncompassRest
         {
             private readonly DirtyDictionary<TKey, TValue> _dictionary;
 
+            public int Count => _dictionary.Count;
+
+            bool ICollection<TValue>.IsReadOnly => true;
+
+            bool ICollection.IsSynchronized => ((ICollection)_dictionary._dictionary).IsSynchronized;
+
+            object ICollection.SyncRoot => ((ICollection)_dictionary._dictionary).SyncRoot;
+
             public ValueCollection(DirtyDictionary<TKey, TValue> dictionary)
             {
                 _dictionary = dictionary;
             }
 
-            public int Count => _dictionary.Count;
+            public IEnumerator<TValue> GetEnumerator()
+            {
+                foreach (var pair in _dictionary._dictionary)
+                {
+                    yield return pair.Value;
+                }
+            }
 
-            public bool IsReadOnly => true;
+            void ICollection<TValue>.Add(TValue item) => throw new NotSupportedException();
 
-            public bool IsSynchronized => ((ICollection)_dictionary._dictionary).IsSynchronized;
+            void ICollection<TValue>.Clear() => throw new NotSupportedException();
 
-            public object SyncRoot => ((ICollection)_dictionary._dictionary).SyncRoot;
-
-            public void Add(TValue item) => throw new NotSupportedException();
-
-            public void Clear() => throw new NotSupportedException();
-
-            public bool Contains(TValue item)
+            bool ICollection<TValue>.Contains(TValue item)
             {
                 var comparer = EqualityComparer<TValue>.Default;
                 foreach (var pair in _dictionary._dictionary)
@@ -201,7 +270,7 @@ namespace EncompassRest
                 return false;
             }
 
-            public void CopyTo(TValue[] array, int arrayIndex)
+            void ICollection<TValue>.CopyTo(TValue[] array, int arrayIndex)
             {
                 Preconditions.NotNull(array, nameof(array));
                 Preconditions.LessThan(arrayIndex, nameof(arrayIndex), array.Length, $"{nameof(array)}.Length");
@@ -215,7 +284,7 @@ namespace EncompassRest
                 }
             }
 
-            public void CopyTo(Array array, int index)
+            void ICollection.CopyTo(Array array, int index)
             {
                 Preconditions.NotNull(array, nameof(array));
                 Preconditions.LessThan(index, nameof(index), array.Length, $"{nameof(array)}.Length");
@@ -229,15 +298,7 @@ namespace EncompassRest
                 }
             }
 
-            public IEnumerator<TValue> GetEnumerator()
-            {
-                foreach (var pair in _dictionary._dictionary)
-                {
-                    yield return pair.Value;
-                }
-            }
-
-            public bool Remove(TValue item) => throw new NotSupportedException();
+            bool ICollection<TValue>.Remove(TValue item) => throw new NotSupportedException();
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
@@ -249,13 +310,13 @@ namespace EncompassRest
 
             public KeyValuePair<TKey, TValue> Current => new KeyValuePair<TKey, TValue>(_enumerator.Current.Key, _enumerator.Current.Value);
 
-            public DictionaryEntry Entry => new DictionaryEntry(Current.Key, Current.Value);
+            DictionaryEntry IDictionaryEnumerator.Entry => new DictionaryEntry(Current.Key, Current.Value);
 
-            public object Key => Current.Key;
+            object IDictionaryEnumerator.Key => Current.Key;
 
-            public object Value => Current.Value;
+            object IDictionaryEnumerator.Value => Current.Value;
 
-            object IEnumerator.Current => _dictionaryEnumerator ? Entry : (object)Current;
+            object IEnumerator.Current => _dictionaryEnumerator ? ((IDictionaryEnumerator)this).Entry : (object)Current;
 
             internal Enumerator(DirtyDictionary<TKey, TValue> dictionary, bool dictionaryEnumerator)
             {
@@ -267,7 +328,7 @@ namespace EncompassRest
 
             public bool MoveNext() => _enumerator.MoveNext();
 
-            public void Reset() => _enumerator.Reset();
+            void IEnumerator.Reset() => _enumerator.Reset();
         }
     }
 

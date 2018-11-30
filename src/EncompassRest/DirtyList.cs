@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
@@ -15,12 +16,12 @@ namespace EncompassRest
     /// </summary>
     /// <typeparam name="T"></typeparam>
     [JsonConverter(typeof(DirtyListConverter<>))]
-    internal sealed class DirtyList<T> : IList<T>, IReadOnlyList<T>, IList, IDirty, IIndexOfId
+    internal sealed class DirtyList<T> : IList<T>, IReadOnlyList<T>, IDirtyList
     {
         private static readonly bool s_tIsIIdentifiable = TypeData<T>.TypeInfo.IsSubclassOf(TypeData<DirtyExtensibleObject>.Type);
-        private static string s_idPropertyName = s_tIsIIdentifiable ? DirtyExtensibleObject.GetIdPropertyName(TypeData<T>.TypeInfo) : string.Empty;
+        private static readonly string s_idPropertyName = s_tIsIIdentifiable ? DirtyExtensibleObject.GetIdPropertyName(TypeData<T>.TypeInfo) : string.Empty;
 
-        internal readonly List<DirtyValue<T>> _list = new List<DirtyValue<T>>();
+        internal readonly List<DirtyValue<T>> _list;
         private readonly Dictionary<string, WrapperObject<int>> _dictionary;
 
         public T this[int index]
@@ -28,9 +29,10 @@ namespace EncompassRest
             get => _list[index];
             set
             {
+                var existing = _list[index]._value;
                 if (s_tIsIIdentifiable)
                 {
-                    var existingObj = (DirtyExtensibleObject)(object)_list[index]._value;
+                    var existingObj = (DirtyExtensibleObject)(object)existing;
                     if (existingObj != null)
                     {
                         var existingId = ((IIdentifiable)existingObj).Id;
@@ -48,11 +50,11 @@ namespace EncompassRest
                         {
                             _dictionary[newId] = index;
                         }
-                        newObj.LastId = newId;
                         newObj.PropertyChanged += PropertyChangedHandler;
                     }
                 }
                 _list[index] = value;
+                CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, existing, index));
             }
         }
 
@@ -72,6 +74,8 @@ namespace EncompassRest
 
         public bool IsReadOnly => false;
 
+        public event NotifyCollectionChangedEventHandler CollectionChanged;
+
         bool IList.IsFixedSize => ((IList)_list).IsFixedSize;
 
         bool ICollection.IsSynchronized => ((IList)_list).IsSynchronized;
@@ -81,7 +85,13 @@ namespace EncompassRest
         object IList.this[int index] { get => this[index]; set => this[index] = ValidateValue(value); }
 
         public DirtyList()
+            : this(0)
         {
+        }
+
+        public DirtyList(int capacity)
+        {
+            _list = new List<DirtyValue<T>>(capacity);
             if (s_tIsIIdentifiable)
             {
                 IEqualityComparer<string> comparer = StringComparer.OrdinalIgnoreCase;
@@ -93,15 +103,12 @@ namespace EncompassRest
             }
         }
 
-        public DirtyList(IEnumerable<T> list)
-            : this()
+        public DirtyList(IEnumerable<T> collection)
+            : this((collection as ICollection<T>)?.Count ?? 0)
         {
-            if (list != null)
+            foreach (var item in collection)
             {
-                foreach (var item in list)
-                {
-                    Add(item);
-                }
+                Add(item);
             }
         }
 
@@ -115,28 +122,17 @@ namespace EncompassRest
             {
                 for (var i = _list.Count - 1; i >= 0; --i)
                 {
-                    RemoveAt(i);
+                    RemoveAtInternal(i);
                 }
             }
             else
             {
                 _list.Clear();
             }
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         public bool Contains(T item) => IndexOf(item) >= 0;
-
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            Preconditions.NotNull(array, nameof(array));
-            Preconditions.LessThan(arrayIndex, nameof(arrayIndex), array.Length, $"{nameof(array)}.Length");
-            Preconditions.GreaterThanOrEquals(array.Length - arrayIndex, $"{nameof(array)}.Length - {nameof(arrayIndex)}", Count, nameof(Count));
-
-            for (var i = 0; i < _list.Count; ++i)
-            {
-                array[arrayIndex + i] = _list[i];
-            }
-        }
 
         public IEnumerator<T> GetEnumerator()
         {
@@ -171,6 +167,7 @@ namespace EncompassRest
         public void Insert(int index, T item)
         {
             _list.Insert(index, item);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
             if (s_tIsIIdentifiable)
             {
                 if (index < _list.Count - 1)
@@ -191,7 +188,6 @@ namespace EncompassRest
                     {
                         _dictionary[id] = index;
                     }
-                    obj.LastId = id;
                     obj.PropertyChanged += PropertyChangedHandler;
                 }
             }
@@ -210,7 +206,13 @@ namespace EncompassRest
 
         public void RemoveAt(int index)
         {
-            var item = _list[index];
+            var item = RemoveAtInternal(index);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
+        }
+
+        private T RemoveAtInternal(int index)
+        {
+            var item = _list[index]._value;
             if (s_tIsIIdentifiable)
             {
                 if (index < _list.Count - 1)
@@ -223,7 +225,7 @@ namespace EncompassRest
                         }
                     }
                 }
-                var obj = (DirtyExtensibleObject)(object)item._value;
+                var obj = (DirtyExtensibleObject)(object)item;
                 if (obj != null)
                 {
                     var id = ((IIdentifiable)obj)?.Id;
@@ -235,24 +237,25 @@ namespace EncompassRest
                 }
             }
             _list.RemoveAt(index);
+            return item;
         }
 
         private void PropertyChangedHandler(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == s_idPropertyName)
             {
-                var obj = (DirtyExtensibleObject)sender;
+                var eventArgs = (ValuePropertyChangedEventArgs)e;
                 int? index = null;
-                var lastId = obj.LastId;
-                if (!string.IsNullOrEmpty(lastId))
+                var priorId = (string)eventArgs.PriorValue;
+                if (!string.IsNullOrEmpty(priorId))
                 {
-                    if (_dictionary.TryGetValue(lastId, out var wrapperObject))
+                    if (_dictionary.TryGetValue(priorId, out var wrapperObject))
                     {
                         index = wrapperObject;
-                        _dictionary.Remove(lastId);
+                        _dictionary.Remove(priorId);
                     }
                 }
-                var newId = ((IIdentifiable)obj).Id;
+                var newId = (string)eventArgs.NewValue;
                 if (!string.IsNullOrEmpty(newId))
                 {
                     if (!index.HasValue)
@@ -268,7 +271,18 @@ namespace EncompassRest
                     }
                     _dictionary[newId] = index.GetValueOrDefault();
                 }
-                obj.LastId = newId;
+            }
+        }
+
+        void ICollection<T>.CopyTo(T[] array, int arrayIndex)
+        {
+            Preconditions.NotNull(array, nameof(array));
+            Preconditions.LessThan(arrayIndex, nameof(arrayIndex), array.Length, $"{nameof(array)}.Length");
+            Preconditions.GreaterThanOrEquals(array.Length - arrayIndex, $"{nameof(array)}.Length - {nameof(arrayIndex)}", Count, nameof(Count));
+
+            for (var i = 0; i < _list.Count; ++i)
+            {
+                array[arrayIndex + i] = _list[i];
             }
         }
 

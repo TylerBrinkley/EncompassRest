@@ -15,7 +15,11 @@ namespace EncompassRest
         /// Extension Data
         /// </summary>
         [JsonExtensionData]
-        public IDictionary<string, object> ExtensionData { get => _extensionData ?? (_extensionData = new DirtyDictionary<string, object>(StringComparer.OrdinalIgnoreCase)); set => _extensionData = new DirtyDictionary<string, object>(value, StringComparer.OrdinalIgnoreCase); }
+        public IDictionary<string, object> ExtensionData
+        {
+            get => _extensionData ?? (_extensionData = new DirtyDictionary<string, object>(StringComparer.OrdinalIgnoreCase));
+            set => _extensionData = value != null ? new DirtyDictionary<string, object>(value, StringComparer.OrdinalIgnoreCase) : null;
+        }
 
         internal ExtensibleObject()
         {

@@ -30,7 +30,7 @@ namespace EncompassRest
             Preconditions.NotNull(list, nameof(list));
             Preconditions.NotNullOrEmpty(id, nameof(id));
 
-            if (list is IIndexOfId indexOfId)
+            if (list is IDirtyList indexOfId)
             {
                 return indexOfId.IndexOf(id);
             }
