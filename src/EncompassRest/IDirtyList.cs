@@ -6,5 +6,6 @@ namespace EncompassRest
     internal interface IDirtyList : IList, IDirty, INotifyCollectionChanged
     {
         int IndexOf(string id);
+        void Move(int fromIndex, int toIndex);
     }
 }

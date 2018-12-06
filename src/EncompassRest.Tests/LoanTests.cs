@@ -1511,6 +1511,9 @@ namespace EncompassRest.Tests
                 Assert.AreEqual("Loan.BorrowerRequestedLoanAmount", modelPath);
                 Assert.AreEqual(200000M, priorValue);
                 Assert.AreEqual(250000M, newValue);
+                modelPath = null;
+                priorValue = null;
+                newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, true);
                 Assert.IsFalse(loan.Dirty);
                 Assert.AreEqual(250000M, loan.BorrowerRequestedLoanAmount);
@@ -1522,6 +1525,9 @@ namespace EncompassRest.Tests
                 Assert.AreEqual("Loan.BorrowerRequestedLoanAmount", modelPath);
                 Assert.AreEqual(250000M, priorValue);
                 Assert.AreEqual(200000M, newValue);
+                modelPath = null;
+                priorValue = null;
+                newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, new UpdateLoanOptions { Populate = true, Persistent = false });
                 Assert.IsFalse(loan.Dirty);
                 Assert.AreEqual(200000M, loan.BorrowerRequestedLoanAmount);
@@ -1533,6 +1539,9 @@ namespace EncompassRest.Tests
                 Assert.AreEqual("Loan.AgencyCaseIdentifier", modelPath);
                 Assert.AreEqual(null, priorValue);
                 Assert.AreEqual("987654321", newValue);
+                modelPath = null;
+                priorValue = null;
+                newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, true);
                 Assert.IsFalse(loan.Dirty);
                 Assert.AreEqual("987654321", loan.AgencyCaseIdentifier);

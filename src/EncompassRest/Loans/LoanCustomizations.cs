@@ -91,7 +91,15 @@ namespace EncompassRest.Loans
         {
             e.Path.Push("Loan");
             var modelPath = string.Join(".", e.Path);
-            _fieldChange?.Invoke(this, new FieldChangeEventArgs(modelPath, e.PriorValue, e.NewValue));
+            switch (e.Action)
+            {
+                case AttributeChangedAction.Replace:
+                    if (e.OldStartingIndex == -1)
+                    {
+                        _fieldChange?.Invoke(this, new FieldChangeEventArgs(modelPath, e.OldValues[0], e.NewValues[0]));
+                    }
+                    break;
+            }
         }
 
         /// <summary>

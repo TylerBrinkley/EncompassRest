@@ -118,18 +118,32 @@ namespace EncompassRest
 
         public void Clear()
         {
-            if (s_tIsIIdentifiable)
+            if (_list.Count > 0)
             {
-                for (var i = _list.Count - 1; i >= 0; --i)
+                var list = CollectionChanged != null ? new List<T>() : null;
+                if (list != null)
                 {
-                    RemoveAtInternal(i);
+                    foreach (var item in _list)
+                    {
+                        list.Add(item);
+                    }
+                }
+                if (s_tIsIIdentifiable)
+                {
+                    for (var i = _list.Count - 1; i >= 0; --i)
+                    {
+                        RemoveAtInternal(i);
+                    }
+                }
+                else
+                {
+                    _list.Clear();
+                }
+                if (list != null)
+                {
+                    CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, list));
                 }
             }
-            else
-            {
-                _list.Clear();
-            }
-            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         public bool Contains(T item) => IndexOf(item) >= 0;
@@ -191,6 +205,32 @@ namespace EncompassRest
                     obj.PropertyChanged += PropertyChangedHandler;
                 }
             }
+        }
+
+        public void Move(int fromIndex, int toIndex)
+        {
+            if ((uint)fromIndex >= (uint)Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(fromIndex));
+            }
+            if ((uint)toIndex >= (uint)Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(toIndex));
+            }
+
+            if (fromIndex == toIndex)
+            {
+                return;
+            }
+
+            var temp = _list[fromIndex];
+            var direction = fromIndex < toIndex ? 1 : -1;
+            for (var i = fromIndex; i != toIndex; i += direction)
+            {
+                _list[i] = _list[i + direction];
+            }
+            _list[toIndex] = temp;
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, temp, toIndex, fromIndex));
         }
 
         public bool Remove(T item)

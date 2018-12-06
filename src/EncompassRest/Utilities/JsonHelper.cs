@@ -227,7 +227,7 @@ namespace EncompassRest.Utilities
         
         private static void PopulateArray(JArray jArray, JsonArrayContract arrayContract, IList source, IList target)
         {
-            if (target.Count > 0 && target is IEnumerable<DirtyExtensibleObject> targetEnumerable)
+            if (target.Count > 0 && target is IEnumerable<DirtyExtensibleObject> targetEnumerable && target is IDirtyList targetDirtyList)
             {
                 var objectContract = (JsonObjectContract)InternalPrivateContractResolver.ResolveContract(arrayContract.CollectionItemType);
                 var sourceEnumerable = (IEnumerable<DirtyExtensibleObject>)source;
@@ -263,11 +263,7 @@ namespace EncompassRest.Utilities
                         }
                         if (index > i)
                         {
-                            for (var j = i; j < index; ++j)
-                            {
-                                target[j + 1] = target[j];
-                            }
-                            target[i] = existing;
+                            targetDirtyList.Move(index, i);
                         }
                     }
                     else
