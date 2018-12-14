@@ -69,7 +69,7 @@ namespace EncompassRest.Loans
             add
             {
                 _fieldChange += value;
-                if (IncrementListeners(true) == 0)
+                if (IncrementListeners() == 1)
                 {
                     AttributeChanged += Loan_AttributeChanged;
                 }
@@ -79,7 +79,7 @@ namespace EncompassRest.Loans
                 if (_fieldChange != null)
                 {
                     _fieldChange -= value;
-                    if (IncrementListeners(false) == 1)
+                    if (DecrementListeners() == 0)
                     {
                         AttributeChanged -= Loan_AttributeChanged;
                     }
