@@ -77,6 +77,7 @@ namespace EncompassRest.Loans
         private DirtyValue<StringEnumValue<FundsTypeDescription>> _downPaymentOtherTypeDescription;
         private DirtyValue<StringEnumValue<DownPaymentSourceType>> _downPaymentSourceType;
         private DirtyValue<StringEnumValue<SourceTypeDescription>> _downPaymentSourceTypeOtherDescription;
+        private DirtyValue<bool?> _eNoteIndicator;
         private DirtyValue<StringEnumValue<FannieARMIndexType>> _fannieARMIndexType;
         private DirtyValue<StringEnumValue<FannieAutoUWDec>> _fannieAutoUWDec;
         private DirtyValue<int?> _fannieBLTV;
@@ -456,6 +457,7 @@ namespace EncompassRest.Loans
         /// <summary>
         /// ULDD - Freddie Mac - Closing Cost Funds Type Other Description [ULDD.FRE.CLOSINGCOST2FUNDSTYPEOTHERDESC]
         /// </summary>
+        [LoanFieldProperty(MissingOptionsJson = "[\"Grant\"]")]
         public StringEnumValue<FundsTypeDescription> ClosingCost2FundsTypeOtherDescription { get => _closingCost2FundsTypeOtherDescription; set => SetField(ref _closingCost2FundsTypeOtherDescription, value); }
 
         /// <summary>
@@ -482,6 +484,7 @@ namespace EncompassRest.Loans
         /// <summary>
         /// ULDD - Freddie Mac - Closing Cost Funds Type Other Description [ULDD.FRE.CLOSINGCOST3FUNDSTYPEOTHERDESC]
         /// </summary>
+        [LoanFieldProperty(MissingOptionsJson = "[\"Grant\"]")]
         public StringEnumValue<FundsTypeDescription> ClosingCost3FundsTypeOtherDescription { get => _closingCost3FundsTypeOtherDescription; set => SetField(ref _closingCost3FundsTypeOtherDescription, value); }
 
         /// <summary>
@@ -508,6 +511,7 @@ namespace EncompassRest.Loans
         /// <summary>
         /// ULDD - Freddie Mac - Closing Cost Funds Type Other Description [ULDD.FRE.CLOSINGCOST4FUNDSTYPEOTHERDESC]
         /// </summary>
+        [LoanFieldProperty(MissingOptionsJson = "[\"Grant\"]")]
         public StringEnumValue<FundsTypeDescription> ClosingCost4FundsTypeOtherDescription { get => _closingCost4FundsTypeOtherDescription; set => SetField(ref _closingCost4FundsTypeOtherDescription, value); }
 
         /// <summary>
@@ -534,6 +538,7 @@ namespace EncompassRest.Loans
         /// <summary>
         /// ULDD - Freddie Mac - Closing Cost Funds Type Other Description [ULDD.X107]
         /// </summary>
+        [LoanFieldProperty(MissingOptionsJson = "[\"Grant\"]")]
         public StringEnumValue<FundsTypeDescription> ClosingCostFundsTypeOtherDescription { get => _closingCostFundsTypeOtherDescription; set => SetField(ref _closingCostFundsTypeOtherDescription, value); }
 
         /// <summary>
@@ -650,6 +655,7 @@ namespace EncompassRest.Loans
         /// <summary>
         /// ULDD - Freddie Mac - Down Payment Other Type Description [ULDD.X113]
         /// </summary>
+        [LoanFieldProperty(MissingOptionsJson = "[\"Grant\"]")]
         public StringEnumValue<FundsTypeDescription> DownPaymentOtherTypeDescription { get => _downPaymentOtherTypeDescription; set => SetField(ref _downPaymentOtherTypeDescription, value); }
 
         /// <summary>
@@ -661,6 +667,11 @@ namespace EncompassRest.Loans
         /// ULDD - Down Payment SourceType Other Description [ULDD.X90]
         /// </summary>
         public StringEnumValue<SourceTypeDescription> DownPaymentSourceTypeOtherDescription { get => _downPaymentSourceTypeOtherDescription; set => SetField(ref _downPaymentSourceTypeOtherDescription, value); }
+
+        /// <summary>
+        /// ULDD - eNote Indicator [ULDD.X196]
+        /// </summary>
+        public bool? eNoteIndicator { get => _eNoteIndicator; set => SetField(ref _eNoteIndicator, value); }
 
         /// <summary>
         /// ULDD Fannie ARM Index Type [ULDD.FNM.ARMIndexType]

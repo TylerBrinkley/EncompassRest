@@ -14,6 +14,9 @@ using System.ComponentModel;
 
 namespace EncompassRest
 {
+    /// <summary>
+    /// The client object to make calls to the Encompass Apis. Use the static factory Create* methods to create a client object.
+    /// </summary>
     public sealed class EncompassRestClient : IDisposable
     {
 #if NET45
@@ -23,6 +26,13 @@ namespace EncompassRest
         }
 #endif
 
+        /// <summary>
+        /// Creates a client object which will automatically invoke the tokenInitializer when making an Api call with an expired token.
+        /// </summary>
+        /// <param name="parameters">The parameters to initialize the client object with.</param>
+        /// <param name="tokenInitializer">The function to retrieve a new token when making an Api call with an expired token.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+        /// <returns></returns>
         public static async Task<EncompassRestClient> CreateAsync(ClientParameters parameters, Func<TokenCreator, Task<string>> tokenInitializer, CancellationToken cancellationToken = default)
         {
             Preconditions.NotNull(parameters, nameof(parameters));
@@ -34,6 +44,15 @@ namespace EncompassRest
             return client;
         }
 
+        /// <summary>
+        /// Creates a client object from user credentials. It does not automatically retrieve a new token when the current one expires so most of the time you'll probably want to use the CreateAsync method instead.
+        /// </summary>
+        /// <param name="parameters">The parameters to initialize the client object with.</param>
+        /// <param name="instanceId">The encompass instance id.</param>
+        /// <param name="userId">The encompass user id.</param>
+        /// <param name="password">The encompass user password.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+        /// <returns></returns>
         public static async Task<EncompassRestClient> CreateFromUserCredentialsAsync(ClientParameters parameters, string instanceId, string userId, string password, CancellationToken cancellationToken = default)
         {
             Preconditions.NotNull(parameters, nameof(parameters));
@@ -50,9 +69,19 @@ namespace EncompassRest
 
         [Obsolete("Use the ClientParameters overload instead.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public static Task<EncompassRestClient> CreateFromUserCredentialsAsync(string apiClientId, string apiClientSecret, string instanceId, string userId, string password, CancellationToken cancellationToken = default) =>
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
             CreateFromUserCredentialsAsync(new ClientParameters(apiClientId, apiClientSecret), instanceId, userId, password, cancellationToken);
 
+        /// <summary>
+        /// Creates a client object from an authorization code.
+        /// </summary>
+        /// <param name="parameters">The parameters to initialize the client object with.</param>
+        /// <param name="redirectUri">The redirect uri associated with the authorization code.</param>
+        /// <param name="authorizationCode">The authorization code to use.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+        /// <returns></returns>
         public static async Task<EncompassRestClient> CreateFromAuthorizationCodeAsync(ClientParameters parameters, string redirectUri, string authorizationCode, CancellationToken cancellationToken = default)
         {
             Preconditions.NotNull(parameters, nameof(parameters));
@@ -68,9 +97,18 @@ namespace EncompassRest
 
         [Obsolete("Use the ClientParameters overload instead.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public static Task<EncompassRestClient> CreateFromAuthorizationCodeAsync(string apiClientId, string apiClientSecret, string redirectUri, string authorizationCode, CancellationToken cancellationToken = default) =>
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
             CreateFromAuthorizationCodeAsync(new ClientParameters(apiClientId, apiClientSecret), redirectUri, authorizationCode, cancellationToken);
 
+        /// <summary>
+        /// Creates a client object from an existing access token.
+        /// </summary>
+        /// <param name="parameters">The parameters to initialize the client object with.</param>
+        /// <param name="accessToken">The access token to use.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+        /// <returns></returns>
         public static async Task<EncompassRestClient> CreateFromAccessTokenAsync(ClientParameters parameters, string accessToken, CancellationToken cancellationToken = default)
         {
             Preconditions.NotNull(parameters, nameof(parameters));
@@ -84,7 +122,9 @@ namespace EncompassRest
 
         [Obsolete("Use CreateFromAccessTokenAsync instead.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public static EncompassRestClient CreateFromAccessToken(ClientParameters parameters, string accessToken)
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         {
             Preconditions.NotNull(parameters, nameof(parameters));
             Preconditions.NotNullOrEmpty(accessToken, nameof(accessToken));
@@ -96,8 +136,10 @@ namespace EncompassRest
 
         [Obsolete("Use the ClientParameters overload instead.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public static EncompassRestClient CreateFromAccessToken(string apiClientId, string apiClientSecret, string accessToken) => CreateFromAccessToken(new ClientParameters(apiClientId, apiClientSecret), accessToken);
-        
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
+
         private readonly Func<TokenCreator, Task<string>> _tokenInitializer;
         private int _timeoutRetryCount;
 
@@ -119,15 +161,28 @@ namespace EncompassRest
         private Settings.Settings _settings;
         private Services.Services _services;
         private Company.Company _company;
+        private Organizations.Organizations _organizations;
         private BaseApiClient _baseApiClient;
 
         #region Properties
+        /// <summary>
+        /// The access token and related Apis.
+        /// </summary>
         public AccessToken AccessToken { get; }
 
+        /// <summary>
+        /// Indicates how an expired token is handled by the client.
+        /// </summary>
         public TokenExpirationHandling TokenExpirationHandling => _tokenInitializer != null ? TokenExpirationHandling.RetrieveNewToken : TokenExpirationHandling.Default;
 
+        /// <summary>
+        /// The time span before Api requests are considered timed-out. Default is 100 seconds.
+        /// </summary>
         public TimeSpan Timeout { get; }
 
+        /// <summary>
+        /// The number of times to retry requests when there's a gateway timeout. Default is 0.
+        /// </summary>
         public int TimeoutRetryCount
         {
             get => _timeoutRetryCount;
@@ -140,8 +195,14 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// An event that occurs before attempting to retry a request when there's a gateway timeout.
+        /// </summary>
         public event EventHandler<TimeoutRetryEventArgs> TimeoutRetry;
 
+        /// <summary>
+        /// The Loans Apis.
+        /// </summary>
         public Loans.Loans Loans
         {
             get
@@ -151,6 +212,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Schema Apis.
+        /// </summary>
         public Schema.Schema Schema
         {
             get
@@ -160,6 +224,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Webhook Apis.
+        /// </summary>
         public Webhook.Webhook Webhook
         {
             get
@@ -169,6 +236,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Loan Pipeline Apis.
+        /// </summary>
         public Pipeline Pipeline
         {
             get
@@ -178,6 +248,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Loan Batch Update Apis.
+        /// </summary>
         public BatchUpdate BatchUpdate
         {
             get
@@ -187,6 +260,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Borrower Contacts Apis.
+        /// </summary>
         public BorrowerContacts BorrowerContacts
         {
             get
@@ -196,6 +272,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Business Contacts Apis.
+        /// </summary>
         public BusinessContacts BusinessContacts
         {
             get
@@ -205,6 +284,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Borrower Contact Selector Apis.
+        /// </summary>
         public BorrowerContactSelector BorrowerContactSelector
         {
             get
@@ -214,6 +296,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Business Contact Selector Apis.
+        /// </summary>
         public BusinessContactSelector BusinessContactSelector
         {
             get
@@ -223,6 +308,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Contact Groups Apis.
+        /// </summary>
         public ContactGroups ContactGroups
         {
             get
@@ -242,7 +330,9 @@ namespace EncompassRest
         }
 
         [Obsolete("Use EncompassRestClient.Company.GlobalCustomDataObjects instead.")]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public GlobalCustomDataObjects GlobalCustomDataObjects
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         {
             get
             {
@@ -252,7 +342,9 @@ namespace EncompassRest
         }
 
         [Obsolete("Use EncompassRestClient.Company.Users.GetUserApis(userId).CustomDataObjects instead.")]
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public Users.Users Users
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         {
             get
             {
@@ -261,6 +353,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Loan Folders Apis.
+        /// </summary>
         public LoanFolders.LoanFolders LoanFolders
         {
             get
@@ -270,6 +365,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Settings Apis.
+        /// </summary>
         public Settings.Settings Settings
         {
             get
@@ -279,6 +377,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// The Services Apis.
+        /// </summary>
         public Services.Services Services
         {
             get
@@ -289,7 +390,7 @@ namespace EncompassRest
         }
 
         /// <summary>
-        /// Company Apis
+        /// The Company Apis.
         /// </summary>
         public Company.Company Company
         {
@@ -300,6 +401,21 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// Organizations Apis
+        /// </summary>
+        public Organizations.Organizations Organizations
+        {
+            get
+            {
+                var organizations = _organizations;
+                return organizations ?? Interlocked.CompareExchange(ref _organizations, (organizations = new Organizations.Organizations(this)), null) ?? organizations;
+            }
+        }
+
+        /// <summary>
+        /// Property for sharing common cache between multiple clients such as custom field descriptors.
+        /// </summary>
         public CommonCache CommonCache { get; }
 
         internal HttpClient HttpClient
@@ -320,6 +436,9 @@ namespace EncompassRest
             }
         }
 
+        /// <summary>
+        /// A base Api client for use when Apis aren't supported directly.
+        /// </summary>
         public BaseApiClient BaseApiClient
         {
             get
@@ -330,6 +449,9 @@ namespace EncompassRest
         }
         #endregion
 
+        /// <summary>
+        /// An event that occurs when an Api response is received.
+        /// </summary>
         public event EventHandler<ApiResponseEventArgs> ApiResponse;
 
         internal EncompassRestClient(ClientParameters parameters, Func<TokenCreator, Task<string>> tokenInitializer = null)
@@ -342,6 +464,9 @@ namespace EncompassRest
             CommonCache = parameters.CommonCache ?? (parameters.CommonCache = new CommonCache());
         }
 
+        /// <summary>
+        /// Disposes of the client object.
+        /// </summary>
         public void Dispose()
         {
             AccessToken.Dispose();

@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Elli.Api.Loans.Model;
-using EncompassRest.Company.Users.Rights;
 using EncompassRest.Loans;
 using EncompassRest.Loans.Enums;
 using EncompassRest.Schema;
@@ -121,7 +120,6 @@ namespace EncompassRest
                 typeof(HmdaLoanPurpose),
                 typeof(PaidToOrBy),
                 typeof(BorrowerOrCoBorrower),
-                typeof(State),
                 typeof(NonVolAdjustmentType),
                 typeof(HudLoanDataResidencyType),
                 typeof(LienPosition),
@@ -130,7 +128,18 @@ namespace EncompassRest
                 typeof(HelocBalance),
                 typeof(MortgageType),
                 typeof(RefinanceType),
-                typeof(PerDiemCalculationMethodType)
+                typeof(PerDiemCalculationMethodType),
+                typeof(UnitType),
+                typeof(HmdaCreditScoreForDecisionMaking),
+                typeof(HmdaCreditScoringModel),
+                typeof(YNOrPartiallyExempt),
+                typeof(RefinanceCashOutDeterminationType),
+                typeof(GovernmentRefinanceType),
+                typeof(ConstructionToPermanentClosingType),
+                typeof(AssetType),
+                typeof(OtherAssetType),
+                typeof(CounselingFormatType),
+                typeof(Description)
             };
             s_sharedEnums = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var sharedEnumType in sharedEnumTypes)
@@ -156,7 +165,18 @@ namespace EncompassRest
             "DenialReason4",
             "AdjustsTermType",
             "PrepaymentPenaltyPayOffInDateType",
-            "LogDUPropertyType"
+            "LogDUPropertyType",
+            "ClosingCost2FundsTypeOtherDescription",
+            "ClosingCost3FundsTypeOtherDescription",
+            "ClosingCost4FundsTypeOtherDescription",
+            "ClosingCostFundsTypeOtherDescription",
+            "DownPaymentOtherTypeDescription",
+            "HmdaCreditScoreForDecisionMaking",
+            "HmdaCreditScoringModel",
+            "GovernmentRefinanceType",
+            "PropertyFormType",
+            "InsuranceProjectType",
+            "LogLPPropertyType"
         };
 
         private static readonly HashSet<string> s_enumPropertyNamesToUseEntityTypeInName = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -171,7 +191,11 @@ namespace EncompassRest
             "MortgageOriginator",
             "AppraisalType",
             "MortgageType",
-            "RefinanceType"
+            "RefinanceType",
+            "AssetType",
+            "Description",
+            "CounselingFormatType",
+            "Source"
         };
 
         private static readonly Dictionary<string, string> s_explicitStringEnumValues = new Dictionary<string, string>
@@ -179,12 +203,14 @@ namespace EncompassRest
             { "LoanAssociate.LoanAssociateType", nameof(LoanAssociateType) },
             { "AdditionalStateDisclosure.StateCode", nameof(State) },
             { "LoanAssociate.EnableWriteAccess", nameof(YOrN) },
-            { "FreddieMac.CondoClass", nameof(CondoClass) }
+            { "FreddieMac.CondoClass", nameof(CondoClass) },
+            { "MilestoneTaskContact.State", nameof(State) },
+            { "Miscellaneous.State", nameof(State) }
         };
 
         private static readonly HashSet<string> s_stringDictionaryProperties = new HashSet<string> { "Loan.VirtualFields", "DocumentOrderLog.DocumentFields", "ElliUCDDetail.CDFields", "ElliUCDDetail.LEFields" };
 
-        private static readonly HashSet<string> s_propertiesToNotGenerate = new HashSet<string> { "Contact.Contact", "Loan.CurrentApplication", "Borrower.Application" };
+        private static readonly HashSet<string> s_propertiesToNotGenerate = new HashSet<string> { "Contact.Contact", "Loan.CurrentApplication", "Borrower.Application", "Uldd.ENoteIndicator", "GoodFaithFeeVarianceCureLog.GffVAlertTriggerFieldLog" };
 
         private static readonly HashSet<string> s_propertiesWithInternalFields = new HashSet<string> { "CustomField.DateValue", "CustomField.NumericValue", "CustomField.StringValue", "FieldLockData.ModelPath" };
 
@@ -213,7 +239,18 @@ namespace EncompassRest
             { "HtmlEmailLog", new Dictionary<string, PropertySchema> { { "DocList", new PropertySchema { Type = PropertySchemaType.List, ElementType = "EmailDocument" } } } }
         };
 
-        private static readonly HashSet<string> s_explicitDateTimeProperties = new HashSet<string> { "DisclosureTracking2015Log.ActualFulfillmentDate", "DisclosureTracking2015Log.ApplicationDate", "DisclosureTracking2015Log.BorrowerActualReceivedDate", "DisclosureTracking2015Log.BorrowerPresumedReceivedDate", "DisclosureTracking2015Log.CDDateIssued", "DisclosureTracking2015Log.ClosingDate", "DisclosureTracking2015Log.CoBorrowerActualReceivedDate", "DisclosureTracking2015Log.CoBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.DisclosedDate", "DisclosureTracking2015Log.IntentToProceedDate", "DisclosureTracking2015Log.LockedBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.LockedCoBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.LockedDisclosedDateField", "DisclosureTracking2015Log.LockedDisclosedReceivedDate", "DisclosureTracking2015Log.PresumedFulfillmentDate", "DisclosureTracking2015Log.ReceivedDate", "DisclosureTracking2015Log.RevisedDueDate" };
+        private static readonly HashSet<string> s_explicitDateTimeProperties = new HashSet<string> { "DisclosureTracking2015Log.ActualFulfillmentDate", "DisclosureTracking2015Log.ApplicationDate", "DisclosureTracking2015Log.BorrowerActualReceivedDate", "DisclosureTracking2015Log.BorrowerPresumedReceivedDate", "DisclosureTracking2015Log.CDDateIssued", "DisclosureTracking2015Log.ClosingDate", "DisclosureTracking2015Log.CoBorrowerActualReceivedDate", "DisclosureTracking2015Log.CoBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.DisclosedDate", "DisclosureTracking2015Log.IntentToProceedDate", "DisclosureTracking2015Log.LockedBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.LockedCoBorrowerPresumedReceivedDate", "DisclosureTracking2015Log.LockedDisclosedDateField", "DisclosureTracking2015Log.LockedDisclosedReceivedDate", "DisclosureTracking2015Log.PresumedFulfillmentDate", "DisclosureTracking2015Log.ReceivedDate", "DisclosureTracking2015Log.RevisedDueDate", "DisclosureTracking2015Log.ChangesReceivedDate" };
+
+        private static readonly HashSet<string> s_explicitNADecimalProperties = new HashSet<string>
+        {
+            "Hmda.CLTV",
+            "Hmda.DebtToIncomeRatio",
+            "Hmda.DiscountPoints",
+            "Hmda.InterestRate",
+            "Hmda.LenderCredits",
+            "Hmda.PropertyValue",
+            "Hmda.RateSpread"
+        };
 
         private static readonly Dictionary<string, HashSet<string>> s_enumOptionsToIgnore = new Dictionary<string, HashSet<string>>
         {
@@ -222,7 +259,7 @@ namespace EncompassRest
 
         private static readonly HashSet<string> s_ignoredEntities = new HashSet<string> { };
 
-        private static readonly Dictionary<string, List<string>> s_mergeEntities = new Dictionary<string, List<string>> { { "NonBorrowingOwner", new List<string> { "NonBorrowingOwnerContract" } }, { "AlertChangeCircumstance", new List<string> { "AlertChangeCircumstanceContract" } } };
+        private static readonly Dictionary<string, List<string>> s_mergeEntities = new Dictionary<string, List<string>> { { "NonBorrowingOwner", new List<string> { "NonBorrowingOwnerContract" } }, { "AlertChangeCircumstance", new List<string> { "AlertChangeCircumstanceContract" } }, { "OtherIncomeSource", new List<string> { "OtherIncomeSourceContract" } } };
 
         private static readonly string s_encompassSDKFolder = Path.Combine(Directory.EnumerateDirectories("C:\\SmartClientCache\\Apps\\UAC\\Ellie Mae\\").First(), "Encompass360");
 
@@ -240,17 +277,10 @@ namespace EncompassRest
             try
             {
                 Dictionary<string, EntitySchema> entityTypes;
-                //string userRights;
                 using (var client = await TestBaseClass.GetTestClientAsync().ConfigureAwait(false))
                 {
                     entityTypes = (await client.Schema.GetLoanSchemaAsync(true).ConfigureAwait(false)).EntityTypes;
-                    //userRights = await client.Company.Users.GetUserApis("me").Rights.GetRightsRawAsync(UserRightsType.Effective).ConfigureAwait(false);
                 }
-
-                //var rightsPath = "Company\\Users\\Rights";
-                //Directory.CreateDirectory(rightsPath);
-
-                //GenerateClassesFromJson(rightsPath, "EncompassRest.Company.Users.Rights", "UserRights", null, JObject.Parse(userRights), new HashSet<string>(StringComparer.OrdinalIgnoreCase), "Rights");
 
                 foreach (var pair in s_mergeEntities)
                 {
@@ -928,6 +958,10 @@ namespace EncompassRest
                     {
                         propertyType = "DateTime?";
                     }
+                    else if (s_explicitNADecimalProperties.Contains(entityPropertyName))
+                    {
+                        propertyType = "NA<decimal>";
+                    }
                     else if (propertySchema.AllowedValues?.Count > 0)
                     {
                         if (propertyType == "string")
@@ -1005,7 +1039,10 @@ namespace EncompassRest
                     }
                     if (propertyType.StartsWith("StringEnumValue<"))
                     {
-                        enumsNamespace = true;
+                        if (propertyType != "StringEnumValue<State>")
+                        {
+                            enumsNamespace = true;
+                        }
                     }
                     else if (propertyType == "DateTime?")
                     {
