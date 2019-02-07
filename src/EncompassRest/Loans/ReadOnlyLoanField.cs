@@ -5,30 +5,48 @@ using EncompassRest.Utilities;
 
 namespace EncompassRest.Loans
 {
+    /// <summary>
+    /// The read only loan field view.
+    /// </summary>
     public class ReadOnlyLoanField
     {
         internal readonly Loan Loan;
         internal readonly ModelPath _modelPath;
         private readonly object _value;
 
+        /// <summary>
+        /// The field descriptor.
+        /// </summary>
         public FieldDescriptor Descriptor { get; }
 
+        /// <summary>
+        /// The field id.
+        /// </summary>
         public string FieldId => Descriptor.FieldId;
 
         /// <summary>
-        /// For use with loan field locking.
+        /// The field model path for use with loan field locking.
         /// </summary>
         public string ModelPath => _modelPath.ToString();
 
         /// <summary>
-        /// For use with Webhook filter attributes.
+        /// The field attribute path for use with Webhook filter attributes.
         /// </summary>
         public string AttributePath => _modelPath.ToString(name => JsonHelper.CamelCaseNamingStrategy.GetPropertyName(name, false), true).Replace("/currentApplication", "/applications/*");
 
+        /// <summary>
+        /// The field's borrower pair index.
+        /// </summary>
         public int? BorrowerPairIndex { get; }
 
+        /// <summary>
+        /// The loan field's format.
+        /// </summary>
         public LoanFieldFormat? Format => Descriptor.Format;
 
+        /// <summary>
+        /// The field's unformatted value.
+        /// </summary>
         public string UnformattedValue => GetUnformattedValue() ?? string.Empty;
 
         private string GetUnformattedValue()
@@ -63,6 +81,9 @@ namespace EncompassRest.Loans
             return ToString();
         }
 
+        /// <summary>
+        /// The field's formatted value.
+        /// </summary>
         public string FormattedValue => GetFormattedValue() ?? string.Empty;
 
         private string GetFormattedValue()
@@ -108,10 +129,16 @@ namespace EncompassRest.Loans
             return ToString();
         }
 
+        /// <summary>
+        /// The field's value.
+        /// </summary>
         public object Value => GetValue();
 
         internal virtual object GetValue() => _value;
 
+        /// <summary>
+        /// Indicates if the field is empty.
+        /// </summary>
         public bool IsEmpty
         {
             get
@@ -130,8 +157,16 @@ namespace EncompassRest.Loans
             _value = value;
         }
 
+        /// <summary>
+        /// Returns the field's value as a <see cref="string"/>.
+        /// </summary>
+        /// <returns></returns>
         public override string ToString() => Value?.ToString();
 
+        /// <summary>
+        /// Returns the field's value as a <see cref="DateTime"/>.
+        /// </summary>
+        /// <returns></returns>
         public DateTime? ToDateTime()
         {
             var value = Value;
@@ -145,6 +180,10 @@ namespace EncompassRest.Loans
             return null;
         }
 
+        /// <summary>
+        /// Returns the field's value as a <see cref="decimal"/>.
+        /// </summary>
+        /// <returns></returns>
         public decimal? ToDecimal()
         {
             var value = Value;
@@ -160,6 +199,10 @@ namespace EncompassRest.Loans
             return null;
         }
 
+        /// <summary>
+        /// Returns the field's value as an <see cref="int"/>.
+        /// </summary>
+        /// <returns></returns>
         public int? ToInt32()
         {
             var value = Value;
@@ -175,6 +218,10 @@ namespace EncompassRest.Loans
             return null;
         }
 
+        /// <summary>
+        /// Returns the field's value as a <see cref="bool"/>.
+        /// </summary>
+        /// <returns></returns>
         public bool? ToBoolean()
         {
             var value = Value;

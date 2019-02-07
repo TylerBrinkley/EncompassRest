@@ -22,7 +22,6 @@ namespace EncompassRest.Webhook
         private NeverSerializeValue<string> _objectUrn;
         private NeverSerializeValue<string> _instanceId;
         private string _endpoint;
-        private StringEnumValue<WebhookResourceType> _resource;
         private string _signingKey;
 
         /// <summary>

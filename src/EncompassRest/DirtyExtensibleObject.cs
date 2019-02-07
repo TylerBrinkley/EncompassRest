@@ -369,7 +369,7 @@ namespace EncompassRest
             return fieldValue;
         }
 
-        internal new IDictionary<string, T> GetField<T>(ref DirtyDictionary<string, T> field, [CallerMemberName] string propertyName = null) => base.GetField(ref field);
+        internal IDictionary<string, T> GetField<T>(ref DirtyDictionary<string, T> field, [CallerMemberName] string propertyName = null) => base.GetField(ref field);
 
         private bool _gettingDirty;
         private bool _settingDirty;
