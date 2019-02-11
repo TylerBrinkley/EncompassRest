@@ -16,7 +16,7 @@ namespace EncompassRest
     /// </summary>
     public sealed class CommonCache
     {
-        private ConcurrentDictionary<string, FieldDescriptor> _customFields = new ConcurrentDictionary<string, FieldDescriptor>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, FieldDescriptor> _customFields = new ConcurrentDictionary<string, FieldDescriptor>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// The custom fields cache.

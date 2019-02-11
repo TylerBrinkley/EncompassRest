@@ -79,7 +79,7 @@ namespace EncompassRest.Loans
         static LoanFieldDescriptors()
         {
             // Use embedded resource file for built-in field mappings to save assembly space
-            using (var stream = typeof(LoanFields).GetTypeInfo().Assembly.GetManifestResourceStream("EncompassRest.LoanFields.zip"))
+            using (var stream = typeof(LoanFieldDescriptors).GetTypeInfo().Assembly.GetManifestResourceStream("EncompassRest.LoanFields.zip"))
             {
                 using (var zip = new ZipArchive(stream))
                 {
