@@ -22,6 +22,8 @@ namespace EncompassRest.Utilities
         internal static readonly CustomContractResolver InternalPrivateContractResolver = new PrivateContractResolver();
         internal static readonly JsonSerializer DefaultPublicSerializer = new JsonSerializer { ContractResolver = s_publicContractResolver, NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.None };
         internal static readonly JsonSerializer DefaultIndentedPublicSerializer = new JsonSerializer { ContractResolver = s_publicContractResolver, NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented };
+        internal static readonly JsonSerializer DefaultDirtySerializer = new JsonSerializer { ContractResolver = InternalPrivateContractResolver, ObjectCreationHandling = ObjectCreationHandling.Replace, Formatting = Formatting.None };
+        internal static readonly JsonSerializer DefaultIndentedDirtySerializer = new JsonSerializer { ContractResolver = InternalPrivateContractResolver, Formatting = Formatting.Indented };
         internal static readonly Encoding Utf8NoBOM = new UTF8Encoding(false);
 
         public static JsonSerializer CreatePublicSerializer(JsonSerializer existingSerializer)
@@ -63,13 +65,6 @@ namespace EncompassRest.Utilities
             return publicSerializer;
         }
 
-        private static readonly JsonSerializer s_serializer = JsonSerializer.Create(new JsonSerializerSettings
-        {
-            Formatting = Formatting.None,
-            ObjectCreationHandling = ObjectCreationHandling.Replace,
-            ContractResolver = InternalPrivateContractResolver
-        });
-
         public static T FromJson<T>(string json) => (T)FromJson(json, TypeData<T>.Type);
 
         public static object FromJson(string json) => FromJson(json, null);
@@ -86,7 +81,7 @@ namespace EncompassRest.Utilities
 
         public static object FromJson(TextReader reader) => FromJson(reader, null);
 
-        public static object FromJson(TextReader reader, Type type) => s_serializer.Deserialize(reader, type);
+        public static object FromJson(TextReader reader, Type type) => DefaultDirtySerializer.Deserialize(reader, type);
 
         public static void PopulateFromJson(string json, object target)
         {
@@ -103,8 +98,8 @@ namespace EncompassRest.Utilities
             var type = target.GetType();
             using (var jReader = new JsonTextReader(reader))
             {
-                var jToken = s_serializer.Deserialize<JToken>(jReader);
-                var source = jToken.ToObject(type, s_serializer);
+                var jToken = DefaultDirtySerializer.Deserialize<JToken>(jReader);
+                var source = jToken.ToObject(type, DefaultDirtySerializer);
 
                 var contract = InternalPrivateContractResolver.ResolveContract(type);
                 switch (contract)
@@ -244,33 +239,18 @@ namespace EncompassRest.Utilities
                 for (var i = 0; i < source.Count; ++i)
                 {
                     var sourceItem = (DirtyExtensibleObject)source[i];
-                    var id = ((IIdentifiable)sourceItem)?.Id;
-                    DirtyExtensibleObject existing = null;
-                    if (!string.IsNullOrEmpty(id))
+                    if (i == target.Count)
                     {
-                        var index = Extensions.IndexOf(targetEnumerable, id);
-                        if (index >= 0)
-                        {
-                            existing = (DirtyExtensibleObject)target[index];
-                        }
-                    }
-                    if (existing != null)
-                    {
-                        var index = i;
-                        while (!ReferenceEquals(target[index], existing))
-                        {
-                            ++index;
-                        }
-                        if (index > i)
-                        {
-                            targetDirtyList.Move(index, i);
-                        }
+                        target.Add(sourceItem);
                     }
                     else
                     {
-                        if (i == target.Count)
+                        DirtyExtensibleObject existing = null;
+                        var id = ((IIdentifiable)sourceItem)?.Id;
+                        int index;
+                        if (!string.IsNullOrEmpty(id) && (index = Extensions.IndexOf(targetEnumerable, id)) >= i)
                         {
-                            target.Add(sourceItem);
+                            targetDirtyList.Move(index, i);
                         }
                         else
                         {
@@ -281,10 +261,10 @@ namespace EncompassRest.Utilities
                                 existing = null;
                             }
                         }
-                    }
-                    if (existing != null)
-                    {
-                        PopulateObject((JObject)jArray[i], objectContract, sourceItem, existing);
+                        if (existing != null)
+                        {
+                            PopulateObject((JObject)jArray[i], objectContract, sourceItem, existing);
+                        }
                     }
                 }
                 for (var i = target.Count - 1; i >= source.Count; --i)
@@ -321,7 +301,7 @@ namespace EncompassRest.Utilities
 
         public static void ToJson(object value, TextWriter writer) => ToJson(value, null, writer);
 
-        public static void ToJson(object value, Type type, TextWriter writer) => s_serializer.Serialize(writer, value, type);
+        public static void ToJson(object value, Type type, TextWriter writer) => DefaultDirtySerializer.Serialize(writer, value, type);
 
         public static T Clone<T>(this JsonSerializer jsonSerializer, T value)
         {

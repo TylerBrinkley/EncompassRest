@@ -12,6 +12,7 @@ namespace EncompassRest.Tests
     public class WebhookTests : TestBaseClass
     {
         [TestMethod]
+        [ApiTest]
         public async Task Webhook_GetResources()
         {
             var client = await GetTestClientAsync();
@@ -24,6 +25,7 @@ namespace EncompassRest.Tests
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Webhook_GetResource()
         {
             var client = await GetTestClientAsync();
@@ -40,10 +42,11 @@ namespace EncompassRest.Tests
         public void WebhookSubscription_Serialization()
         {
             var subscription = new WebhookSubscription("https://google.com", WebhookResourceType.Loan, new[] { WebhookResourceEvent.Create, WebhookResourceEvent.Update }) { ClientId = "1234567890" };
-            Assert.AreEqual(@"{""events"":[""create"",""update""],""endpoint"":""https://google.com"",""resource"":""Loan""}", subscription.ToJson());
+            Assert.AreEqual(@"{""events"":[""create"",""update""],""endpoint"":""https://google.com"",""resource"":""Loan""}", subscription.ToString(SerializationOptions.Dirty));
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Webhook_CreateAndDelete()
         {
             var client = await GetTestClientAsync();
@@ -73,6 +76,7 @@ namespace EncompassRest.Tests
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Webhook_CreateRawAndDelete()
         {
             var client = await GetTestClientAsync();
@@ -89,6 +93,7 @@ namespace EncompassRest.Tests
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Webhook_FilterAttributes()
         {
             var client = await GetTestClientAsync();

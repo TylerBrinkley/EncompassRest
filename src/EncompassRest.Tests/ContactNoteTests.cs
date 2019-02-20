@@ -13,12 +13,13 @@ namespace EncompassRest.Tests
         {
             var contactNote = new ContactNote("5");
             Assert.AreEqual(contactNote.NoteIdInt, 5);
-            Assert.AreEqual(@"{""noteId"":5}", contactNote.ToJson());
+            Assert.AreEqual(@"{""noteId"":5}", contactNote.ToString(SerializationOptions.Dirty));
             contactNote.Dirty = false;
-            Assert.AreEqual(@"{""noteId"":5}", contactNote.ToJson());
+            Assert.AreEqual(@"{""noteId"":5}", contactNote.ToString(SerializationOptions.Dirty));
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task ContactNote_CreateRetrieveAndDelete()
         {
             //create borrower contact to test notes

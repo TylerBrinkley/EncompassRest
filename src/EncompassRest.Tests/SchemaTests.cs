@@ -12,6 +12,7 @@ namespace EncompassRest.Tests
     public class SchemaTests : TestBaseClass
     {
         [TestMethod]
+        [ApiTest]
         public async Task Schema_GetLoanSchema()
         {
             var client = await GetTestClientAsync();
@@ -28,6 +29,7 @@ namespace EncompassRest.Tests
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Schema_GenerateContract()
         {
             var client = await GetTestClientAsync();
@@ -46,6 +48,7 @@ namespace EncompassRest.Tests
         }
 
         [TestMethod]
+        [ApiTest]
         public async Task Schema_GeneratePaths()
         {
             var client = await GetTestClientAsync();
@@ -65,6 +68,39 @@ namespace EncompassRest.Tests
             {
                 Assert.IsTrue(pair.Value.IndexOf("address", StringComparison.OrdinalIgnoreCase) >= 0);
             }
+        }
+
+        [TestMethod]
+        [ApiTest]
+        public async Task LoanFieldDescriptors_RefreshStandardFields_NoUpdates()
+        {
+            var client = await GetTestClientAsync();
+
+            var count = LoanFieldDescriptors.StandardFields.Count;
+            await LoanFieldDescriptors.RefreshStandardFieldsAsync(client);
+            Assert.AreEqual(count, LoanFieldDescriptors.StandardFields.Count);
+            foreach (var pair in LoanFieldDescriptors.StandardFields)
+            {
+                Assert.AreEqual(pair.Value.GetType(), typeof(FieldDescriptor), pair.Key);
+            }
+        }
+
+        [TestMethod]
+        [ApiTest]
+        public async Task LoanFieldDescriptors_RefreshStandardFields_DoesNotAffectUserAddedFields()
+        {
+            var client = await GetTestClientAsync();
+
+            const string newFieldId = "NEWFIELD";
+            Assert.IsTrue(LoanFieldDescriptors.FieldMappings.TryAdd(newFieldId, "Loan.NewField", false));
+            var count = LoanFieldDescriptors.StandardFields.Count;
+            await LoanFieldDescriptors.RefreshStandardFieldsAsync(client);
+            Assert.AreEqual(count, LoanFieldDescriptors.StandardFields.Count);
+            foreach (var pair in LoanFieldDescriptors.StandardFields)
+            {
+                Assert.AreEqual(pair.Value.GetType(), typeof(FieldDescriptor), pair.Key);
+            }
+            Assert.IsTrue(LoanFieldDescriptors.FieldMappings.ContainsKey(newFieldId));
         }
     }
 }

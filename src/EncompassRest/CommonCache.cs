@@ -77,14 +77,5 @@ namespace EncompassRest
 
             CustomFieldsLastRefreshedUtc = DateTime.UtcNow;
         }
-
-        internal Task TryInitializeAsync(EncompassRestClient client, ClientParameters parameters, CancellationToken cancellationToken)
-        {
-            if (parameters.CustomFieldsCacheInitialization != CacheInitialization.Never && !((DateTime.UtcNow - CustomFieldsLastRefreshedUtc)?.TotalMinutes < (int)parameters.CustomFieldsCacheInitialization))
-            {
-                return RefreshCustomFieldsAsync(client, cancellationToken);
-            }
-            return TaskHelper.CompletedTask;
-        }
     }
 }

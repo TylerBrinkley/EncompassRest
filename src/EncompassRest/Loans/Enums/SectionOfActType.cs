@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Serialization;
 
 namespace EncompassRest.Loans.Enums
@@ -63,12 +62,6 @@ namespace EncompassRest.Loans.Enums
         /// </summary>
         [EnumMember(Value = "257")]
         n257 = 10,
-        /// <summary>
-        /// 203H
-        /// </summary>
-        [Description("203H")]
-        [EnumMember(Value = "203")]
-        n203 = 11,
         /// <summary>
         /// 203H
         /// </summary>
