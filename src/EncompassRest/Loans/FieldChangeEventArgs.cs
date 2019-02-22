@@ -2,17 +2,29 @@
 
 namespace EncompassRest.Loans
 {
+    /// <summary>
+    /// FieldChangeEventArgs
+    /// </summary>
     public sealed class FieldChangeEventArgs : EventArgs
     {
-        public string ModelPath { get; }
+        /// <summary>
+        /// The id of the field whose value changed.
+        /// </summary>
+        public string FieldId { get; }
 
-        public object PriorValue { get; }
+        /// <summary>
+        /// The field's prior value.
+        /// </summary>
+        public ReadOnlyLoanField PriorValue { get; }
 
-        public object NewValue { get; }
+        /// <summary>
+        /// The field's new value.
+        /// </summary>
+        public ReadOnlyLoanField NewValue { get; }
 
-        internal FieldChangeEventArgs(string modelPath, object priorValue, object newValue)
+        internal FieldChangeEventArgs(string fieldId, ReadOnlyLoanField priorValue, ReadOnlyLoanField newValue)
         {
-            ModelPath = modelPath;
+            FieldId = fieldId;
             PriorValue = priorValue;
             NewValue = newValue;
         }

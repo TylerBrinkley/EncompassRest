@@ -350,6 +350,29 @@ namespace EncompassRest
                 Directory.CreateDirectory(destinationPath);
 
                 var loanEntitySchema = entityTypes["Loan"];
+
+                var childrenEntities = new Dictionary<LoanEntity, HashSet<LoanEntity>>();
+                foreach (var pair in entityTypes)
+                {
+                    if (Enums.TryParse<LoanEntity>(pair.Key, out var loanEntity))
+                    {
+                        GetChildrenEntities(pair.Value, loanEntity, childrenEntities);
+                    }
+                    else
+                    {
+                        Console.WriteLine(pair.Key);
+                    }
+                }
+                childrenEntities[LoanEntity.Borrower].Remove(LoanEntity.Application); // Removes cyclical reference
+
+                using (var fs = new FileStream("ChildEntities.json", FileMode.Create))
+                {
+                    using (var sw = new StreamWriter(fs))
+                    {
+                        JsonSerializer.Create(new JsonSerializerSettings { Formatting = Formatting.Indented }).Serialize(sw, childrenEntities);
+                    }
+                }
+
                 var fields = new Dictionary<string, LoanFieldDescriptors.StandardFieldInfo>(StringComparer.OrdinalIgnoreCase);
                 var fieldPatterns = new Dictionary<string, LoanFieldDescriptors.StandardFieldInfo>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -477,6 +500,12 @@ namespace EncompassRest
                         {
                             serializer.Serialize(sw, orderedVirtualFieldPatterns);
                         }
+
+                        var childrenEntitiesEntry = zip.CreateEntry("ChildEntities.json", CompressionLevel.Optimal);
+                        using (var sw = new StreamWriter(childrenEntitiesEntry.Open()))
+                        {
+                            serializer.Serialize(sw, childrenEntities);
+                        }
                     }
                 }
 
@@ -516,6 +545,34 @@ namespace EncompassRest
             }
             Console.Write("Press Enter to End.");
             Console.ReadLine();
+        }
+
+        private static void GetChildrenEntities(EntitySchema entitySchema, LoanEntity loanEntity, Dictionary<LoanEntity, HashSet<LoanEntity>> dictionary)
+        {
+            foreach (var property in entitySchema.Properties.Values)
+            {
+                switch (property.Type.EnumValue)
+                {
+                    case PropertySchemaType.List:
+                    case PropertySchemaType.Set:
+                    case PropertySchemaType.Entity:
+                        if (!dictionary.TryGetValue(loanEntity, out var set))
+                        {
+                            set = new HashSet<LoanEntity>();
+                            dictionary.Add(loanEntity, set);
+                        }
+                        var childEntity = property.Type.EnumValue == PropertySchemaType.Entity ? property.EntityType : property.ElementType;
+                        if (childEntity.EnumValue.HasValue)
+                        {
+                            set.Add(childEntity.EnumValue.GetValueOrDefault());
+                        }
+                        else
+                        {
+                            Console.WriteLine(childEntity);
+                        }
+                        break;
+                }
+            }
         }
 
         private static void GenerateClassesFromJson(string destinationPath, string @namespace, string entityName, JObject jObject, HashSet<string> names, string nameSuffix = null)

@@ -83,6 +83,9 @@ namespace EncompassRest.Loans
 
         private event EventHandler<FieldChangeEventArgs> _fieldChange;
 
+        /// <summary>
+        /// The loan field change event.
+        /// </summary>
         public event EventHandler<FieldChangeEventArgs> FieldChange
         {
             add
@@ -90,35 +93,28 @@ namespace EncompassRest.Loans
                 _fieldChange += value;
                 if (IncrementListeners() == 1)
                 {
-                    AttributeChanged += Loan_AttributeChanged;
+                    AttributeChanging += Loan_AttributeChanging;
                 }
             }
             remove
             {
-                if (_fieldChange != null)
+                _fieldChange -= value;
+                if (DecrementListeners() == 0)
                 {
-                    _fieldChange -= value;
-                    if (DecrementListeners() == 0)
-                    {
-                        AttributeChanged -= Loan_AttributeChanged;
-                    }
+                    AttributeChanging -= Loan_AttributeChanging;
                 }
             }
         }
 
-        private void Loan_AttributeChanged(object sender, AttributeChangedEventArgs e)
+        internal void InvokeFieldChange(FieldChangeEventArgs e) => _fieldChange?.Invoke(this, e);
+
+        private void Loan_AttributeChanging(object sender, AttributeChangingEventArgs e)
         {
             e.Path.Push("Loan");
-            var modelPath = string.Join(".", e.Path);
-            switch (e.Action)
-            {
-                case AttributeChangedAction.Replace:
-                    if (e.OldStartingIndex == -1)
-                    {
-                        _fieldChange?.Invoke(this, new FieldChangeEventArgs(modelPath, e.OldValues[0], e.NewValues[0]));
-                    }
-                    break;
-            }
+            var path = string.Join(".", e.Path);
+            var modelPath = LoanFieldDescriptors.CreateModelPath(path);
+            e.LoanEntity = FieldDescriptor.GetLoanEntityFromModelPath(modelPath);
+            e.Loan = this;
         }
 
         /// <summary>

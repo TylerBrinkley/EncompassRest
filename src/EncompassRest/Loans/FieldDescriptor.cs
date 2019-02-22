@@ -196,23 +196,9 @@ namespace EncompassRest.Loans
                         {
                             loanEntity = EncompassRest.Loans.LoanEntity.VirtualFields;
                         }
-                        else if (_modelPath.Segments.Count == 1)
-                        {
-                            loanEntity = EncompassRest.Loans.LoanEntity.Loan;
-                        }
                         else
                         {
-                            var finalSegmentIndex = _modelPath.Segments.Count - 2;
-
-                            var declaredType = TypeData<Loan>.Type;
-                            for (var i = 0; i <= finalSegmentIndex && declaredType != null; ++i)
-                            {
-                                declaredType = _modelPath.Segments[i].GetDeclaredType(declaredType);
-                            }
-                            if (declaredType != null && EnumsNET.Enums.TryParse<LoanEntity>(declaredType.Name, out var newLoanEntity, EnumFormat.Name))
-                            {
-                                loanEntity = newLoanEntity;
-                            }
+                            loanEntity = GetLoanEntityFromModelPath(_modelPath);
                         }
                     }
 
@@ -220,6 +206,29 @@ namespace EncompassRest.Loans
                     _loanEntityIsSet = true;
                 }
                 return loanEntity;
+            }
+        }
+
+        internal static LoanEntity? GetLoanEntityFromModelPath(ModelPath modelPath)
+        {
+            if (modelPath.Segments.Count == 1)
+            {
+                return EncompassRest.Loans.LoanEntity.Loan;
+            }
+            else
+            {
+                var finalSegmentIndex = modelPath.Segments.Count - 2;
+
+                var declaredType = TypeData<Loan>.Type;
+                for (var i = 0; i <= finalSegmentIndex && declaredType != null; ++i)
+                {
+                    declaredType = modelPath.Segments[i].GetDeclaredType(declaredType);
+                }
+                if (declaredType != null && EnumsNET.Enums.TryParse<LoanEntity>(declaredType.Name, out var loanEntity, EnumFormat.Name))
+                {
+                    return loanEntity;
+                }
+                return null;
             }
         }
 

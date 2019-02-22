@@ -1512,7 +1512,7 @@ namespace EncompassRest.Tests
                 BorrowerRequestedLoanAmount = 200000M
             };
             var loanId = await client.Loans.CreateLoanAsync(loan, true);
-            string modelPath = null;
+            string fieldId = null;
             object priorValue = null;
             object newValue = null;
             try
@@ -1525,10 +1525,10 @@ namespace EncompassRest.Tests
                 Assert.AreEqual(200000M, retrievedLoan.BorrowerRequestedLoanAmount);
                 Assert.AreEqual(200000M, retrievedLoan.BaseLoanAmount);
                 loan.BorrowerRequestedLoanAmount = 250000M;
-                Assert.AreEqual("Loan.BorrowerRequestedLoanAmount", modelPath);
+                Assert.AreEqual("1109", fieldId);
                 Assert.AreEqual(200000M, priorValue);
                 Assert.AreEqual(250000M, newValue);
-                modelPath = null;
+                fieldId = null;
                 priorValue = null;
                 newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, true);
@@ -1539,10 +1539,10 @@ namespace EncompassRest.Tests
                 Assert.AreEqual(250000M, retrievedLoan.BorrowerRequestedLoanAmount);
                 Assert.AreEqual(250000M, retrievedLoan.BaseLoanAmount);
                 loan.BorrowerRequestedLoanAmount = 200000M;
-                Assert.AreEqual("Loan.BorrowerRequestedLoanAmount", modelPath);
+                Assert.AreEqual("1109", fieldId);
                 Assert.AreEqual(250000M, priorValue);
                 Assert.AreEqual(200000M, newValue);
-                modelPath = null;
+                fieldId = null;
                 priorValue = null;
                 newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, new UpdateLoanOptions { Populate = true, Persistent = false });
@@ -1553,10 +1553,10 @@ namespace EncompassRest.Tests
                 Assert.AreEqual(250000M, retrievedLoan.BorrowerRequestedLoanAmount);
                 Assert.AreEqual(250000M, retrievedLoan.BaseLoanAmount);
                 loan.AgencyCaseIdentifier = "987654321";
-                Assert.AreEqual("Loan.AgencyCaseIdentifier", modelPath);
+                Assert.AreEqual("1040", fieldId);
                 Assert.AreEqual(null, priorValue);
                 Assert.AreEqual("987654321", newValue);
-                modelPath = null;
+                fieldId = null;
                 priorValue = null;
                 newValue = null;
                 await client.Loans.UpdateLoanAsync(loan, true);
@@ -1569,11 +1569,11 @@ namespace EncompassRest.Tests
                 Assert.AreEqual(200000M, retrievedLoan.BorrowerRequestedLoanAmount);
                 Assert.AreEqual(200000M, retrievedLoan.BaseLoanAmount);
                 loan.FieldChange -= Loan_FieldChange;
-                modelPath = null;
+                fieldId = null;
                 priorValue = null;
                 newValue = null;
                 loan.BorrowerRequestedLoanAmount = 300000M;
-                Assert.IsNull(modelPath);
+                Assert.IsNull(fieldId);
                 Assert.IsNull(priorValue);
                 Assert.IsNull(newValue);
             }
@@ -1590,9 +1590,9 @@ namespace EncompassRest.Tests
 
             void Loan_FieldChange(object sender, FieldChangeEventArgs e)
             {
-                modelPath = e.ModelPath;
-                priorValue = e.PriorValue;
-                newValue = e.NewValue;
+                fieldId = e.FieldId;
+                priorValue = e.PriorValue.Value;
+                newValue = e.NewValue.Value;
             }
         }
 

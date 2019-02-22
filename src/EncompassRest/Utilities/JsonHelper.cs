@@ -222,7 +222,8 @@ namespace EncompassRest.Utilities
         
         private static void PopulateArray(JArray jArray, JsonArrayContract arrayContract, IList source, IList target)
         {
-            if (target.Count > 0 && target is IEnumerable<DirtyExtensibleObject> targetEnumerable && target is IDirtyList targetDirtyList)
+            var targetDirtyList = target as IDirtyList;
+            if (target.Count > 0 && target is IEnumerable<DirtyExtensibleObject> targetEnumerable && targetDirtyList != null)
             {
                 var objectContract = (JsonObjectContract)InternalPrivateContractResolver.ResolveContract(arrayContract.CollectionItemType);
                 var sourceEnumerable = (IEnumerable<DirtyExtensibleObject>)source;
@@ -241,7 +242,8 @@ namespace EncompassRest.Utilities
                     var sourceItem = (DirtyExtensibleObject)source[i];
                     if (i == target.Count)
                     {
-                        target.Add(sourceItem);
+                        targetDirtyList.AddRange(source, i, source.Count - i);
+                        break;
                     }
                     else
                     {
@@ -250,6 +252,7 @@ namespace EncompassRest.Utilities
                         int index;
                         if (!string.IsNullOrEmpty(id) && (index = Extensions.IndexOf(targetEnumerable, id)) >= i)
                         {
+                            existing = (DirtyExtensibleObject)target[index];
                             targetDirtyList.Move(index, i);
                         }
                         else
@@ -277,9 +280,16 @@ namespace EncompassRest.Utilities
             else
             {
                 target.Clear();
-                foreach (var item in source)
+                if (targetDirtyList != null)
                 {
-                    target.Add(item);
+                    targetDirtyList.AddRange(source, 0, source.Count);
+                }
+                else
+                {
+                    foreach (var item in source)
+                    {
+                        target.Add(item);
+                    }
                 }
             }
         }

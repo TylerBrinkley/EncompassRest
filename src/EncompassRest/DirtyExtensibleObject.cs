@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using EncompassRest.Loans;
 using EncompassRest.Utilities;
 using Newtonsoft.Json.Serialization;
 
@@ -21,14 +22,14 @@ namespace EncompassRest
 #endif
     {
         private int _listeners;
-        private Dictionary<string, AttributeChangedWrapper> _propertiesAttributeLookup;
+        private Dictionary<string, AttributeChangingWrapper> _propertiesAttributeLookup;
 
         internal int IncrementListeners()
         {
             var newNumberOfListeners = Interlocked.Increment(ref _listeners);
             if (newNumberOfListeners == 1)
             {
-                _propertiesAttributeLookup = new Dictionary<string, AttributeChangedWrapper>();
+                _propertiesAttributeLookup = new Dictionary<string, AttributeChangingWrapper>();
                 var customContractResolver = JsonHelper.InternalPrivateContractResolver;
                 var contract = (JsonObjectContract)customContractResolver.ResolveContract(GetType());
                 foreach (var property in contract.Properties)
@@ -42,26 +43,24 @@ namespace EncompassRest
                         {
                             propertyValue = v.Value;
                         }
-                        AttributeChangedWrapper wrapper;
+                        AttributeChangingWrapper wrapper;
                         switch (propertyValue)
                         {
                             case DirtyExtensibleObject dirtyExtensibleObject:
-                                wrapper = new AttributeChangedWrapper(this, propertyName);
-                                dirtyExtensibleObject.AttributeChanged += wrapper.OnAttributeChanged;
+                                wrapper = new AttributeChangingWrapper(this, propertyName);
+                                dirtyExtensibleObject.AttributeChanging += wrapper.OnAttributeChanging;
                                 _propertiesAttributeLookup.Add(propertyName, wrapper);
                                 dirtyExtensibleObject.IncrementListeners();
                                 break;
                             case IEnumerable<DirtyExtensibleObject> list when list is IDirtyList dirtyList:
-                                if (!_propertiesAttributeLookup.TryGetValue(propertyName, out wrapper))
-                                {
-                                    wrapper = new AttributeChangedWrapper(this, propertyName, dirtyList);
-                                    _propertiesAttributeLookup.Add(propertyName, wrapper);
-                                }
+                                wrapper = new AttributeChangingWrapper(this, propertyName, dirtyList);
+                                _propertiesAttributeLookup.Add(propertyName, wrapper);
                                 foreach (var item in list)
                                 {
-                                    item.AttributeChanged += wrapper.OnAttributeChanged;
+                                    item.AttributeChanging += wrapper.OnAttributeChanging;
                                     item.IncrementListeners();
                                 }
+                                dirtyList.CollectionChanging += wrapper.OnCollectionChanging;
                                 dirtyList.CollectionChanged += wrapper.OnCollectionChanged;
                                 break;
                         }
@@ -89,24 +88,21 @@ namespace EncompassRest
                         {
                             propertyValue = v.Value;
                         }
-                        AttributeChangedWrapper wrapper;
+                        AttributeChangingWrapper wrapper;
                         switch (propertyValue)
                         {
                             case DirtyExtensibleObject dirtyExtensibleObject:
-                                dirtyExtensibleObject.AttributeChanged -= _propertiesAttributeLookup[propertyName].OnAttributeChanged;
+                                dirtyExtensibleObject.AttributeChanging -= _propertiesAttributeLookup[propertyName].OnAttributeChanging;
                                 dirtyExtensibleObject.DecrementListeners();
                                 break;
                             case IEnumerable<DirtyExtensibleObject> list when list is IDirtyList dirtyList:
-                                if (!_propertiesAttributeLookup.TryGetValue(propertyName, out wrapper))
-                                {
-                                    wrapper = new AttributeChangedWrapper(this, propertyName, dirtyList);
-                                    _propertiesAttributeLookup.Add(propertyName, wrapper);
-                                }
+                                wrapper = _propertiesAttributeLookup[propertyName];
                                 foreach (var item in list)
                                 {
-                                    item.AttributeChanged -= wrapper.OnAttributeChanged;
+                                    item.AttributeChanging -= wrapper.OnAttributeChanging;
                                     item.DecrementListeners();
                                 }
+                                dirtyList.CollectionChanging -= wrapper.OnCollectionChanging;
                                 dirtyList.CollectionChanged -= wrapper.OnCollectionChanged;
                                 break;
                         }
@@ -117,7 +113,8 @@ namespace EncompassRest
             return newNumberOfListeners;
         }
 
-        internal sealed class AttributeChangedWrapper
+        // Class to propogate changes back to the Loan object and build up the model path.
+        internal sealed class AttributeChangingWrapper
         {
             public DirtyExtensibleObject Source { get; }
 
@@ -125,14 +122,14 @@ namespace EncompassRest
 
             public IDirtyList List { get; }
 
-            public AttributeChangedWrapper(DirtyExtensibleObject source, string propertyName, IDirtyList list = null)
+            public AttributeChangingWrapper(DirtyExtensibleObject source, string propertyName, IDirtyList list = null)
             {
                 Source = source;
                 PropertyName = propertyName;
                 List = list;
             }
 
-            internal void OnAttributeChanged(object sender, AttributeChangedEventArgs e)
+            internal void OnAttributeChanging(object sender, AttributeChangingEventArgs e)
             {
                 var next = PropertyName;
                 if (List != null)
@@ -141,12 +138,17 @@ namespace EncompassRest
                     next += $"[{index}]";
                 }
                 e.Path.Push(next);
-                Source.AttributeChanged?.Invoke(Source, e);
+                Source.AttributeChanging?.Invoke(Source, e);
+            }
+
+            internal void OnCollectionChanging(object sender, AttributeChangingEventArgs e)
+            {
+                e.Path.Push(PropertyName);
+                Source.AttributeChanging?.Invoke(Source, e);
             }
 
             internal void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
             {
-                AttributeChangedEventArgs attributeChangedEventArgs = null;
                 switch (e.Action)
                 {
                     case NotifyCollectionChangedAction.Replace:
@@ -154,26 +156,24 @@ namespace EncompassRest
                         var oldItem = e.OldItems[0] as DirtyExtensibleObject;
                         if (oldItem != null)
                         {
-                            oldItem.AttributeChanged -= OnAttributeChanged;
+                            oldItem.AttributeChanging -= OnAttributeChanging;
                             oldItem.DecrementListeners();
                         }
                         var newItem = e.NewItems[0] as DirtyExtensibleObject;
                         if (newItem != null)
                         {
-                            newItem.AttributeChanged += OnAttributeChanged;
+                            newItem.AttributeChanging += OnAttributeChanging;
                             newItem.IncrementListeners();
                         }
-                        attributeChangedEventArgs = AttributeChangedEventArgs.CreateReplace(PropertyName, e.OldItems, e.NewItems, e.NewStartingIndex);
                         break;
                     case NotifyCollectionChangedAction.Add:
                         // Supports only one item
                         var addedItem = e.NewItems[0] as DirtyExtensibleObject;
                         if (addedItem != null)
                         {
-                            addedItem.AttributeChanged += OnAttributeChanged;
+                            addedItem.AttributeChanging += OnAttributeChanging;
                             addedItem.IncrementListeners();
                         }
-                        attributeChangedEventArgs = AttributeChangedEventArgs.CreateAdd(PropertyName, e.NewItems, e.NewStartingIndex);
                         break;
                     case NotifyCollectionChangedAction.Remove:
                         // Supports multiple items
@@ -181,43 +181,51 @@ namespace EncompassRest
                         {
                             if (item != null)
                             {
-                                item.AttributeChanged -= OnAttributeChanged;
+                                item.AttributeChanging -= OnAttributeChanging;
                                 item.DecrementListeners();
                             }
                         }
-                        attributeChangedEventArgs = AttributeChangedEventArgs.CreateRemove(PropertyName, e.OldItems, e.OldStartingIndex);
-                        break;
-                    case NotifyCollectionChangedAction.Move:
-                        // Supports multiple items
-                        attributeChangedEventArgs = AttributeChangedEventArgs.CreateMove(PropertyName, e.OldItems, e.OldStartingIndex, e.NewStartingIndex);
                         break;
                 }
-                Source.AttributeChanged?.Invoke(Source, attributeChangedEventArgs);
             }
         }
 
         /// <summary>
-        /// The PropertyChanged Event
+        /// The property changed event.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
 
         internal virtual void OnPropertyChanged(string propertyName, object priorValue, object newValue)
         {
             PropertyChanged?.Invoke(this, new ValuePropertyChangedEventArgs(propertyName, priorValue, newValue));
-            AttributeChanged?.Invoke(this, AttributeChangedEventArgs.CreateReplace(propertyName, priorValue, newValue));
         }
 
         internal void ClearPropertyChangedEvent() => PropertyChanged = null;
 
-        internal event EventHandler<AttributeChangedEventArgs> AttributeChanged;
+        internal event EventHandler<AttributeChangingEventArgs> AttributeChanging;
 
         internal void SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
         {
             var existing = field;
             var equals = EqualityComparer<T>.Default.Equals(existing, value);
-            field = value;
-            if (!equals)
+            if (equals)
             {
+                field = value;
+            }
+            else
+            {
+                if (AttributeChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs(propertyName);
+                    AttributeChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                    field = value;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    field = value;
+                }
                 UpdateListeners(propertyName, existing, value);
                 OnPropertyChanged(propertyName, existing, value);
             }
@@ -227,9 +235,24 @@ namespace EncompassRest
         {
             T existing = field;
             var equals = EqualityComparer<T>.Default.Equals(existing, value);
-            field = value;
-            if (!equals)
+            if (equals)
             {
+                field = value;
+            }
+            else
+            {
+                if (AttributeChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs(propertyName);
+                    AttributeChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(false);
+                    field = value;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    field = value;
+                }
                 UpdateListeners(propertyName, existing, value);
                 OnPropertyChanged(propertyName, existing, value);
             }
@@ -239,9 +262,24 @@ namespace EncompassRest
         {
             T existing = field;
             var equals = EqualityComparer<T>.Default.Equals(existing, value);
-            field = value;
-            if (!equals)
+            if (equals)
             {
+                field = value;
+            }
+            else
+            {
+                if (AttributeChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs(propertyName);
+                    AttributeChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(false);
+                    field = value;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    field = value;
+                }
                 UpdateListeners(propertyName, existing, value);
                 OnPropertyChanged(propertyName, existing, value);
             }
@@ -255,10 +293,10 @@ namespace EncompassRest
                 {
                     existingObj.DecrementListeners();
                     var wrapper = _propertiesAttributeLookup[propertyName];
-                    existingObj.AttributeChanged -= wrapper.OnAttributeChanged;
+                    existingObj.AttributeChanging -= wrapper.OnAttributeChanging;
                     if (value is DirtyExtensibleObject valueObj)
                     {
-                        valueObj.AttributeChanged += wrapper.OnAttributeChanged;
+                        valueObj.AttributeChanging += wrapper.OnAttributeChanging;
                         valueObj.IncrementListeners();
                     }
                     else
@@ -268,9 +306,9 @@ namespace EncompassRest
                 }
                 else if (value is DirtyExtensibleObject valueObj)
                 {
-                    var wrapper = new AttributeChangedWrapper(this, propertyName);
+                    var wrapper = new AttributeChangingWrapper(this, propertyName);
                     _propertiesAttributeLookup.Add(propertyName, wrapper);
-                    valueObj.AttributeChanged += wrapper.OnAttributeChanged;
+                    valueObj.AttributeChanging += wrapper.OnAttributeChanging;
                     valueObj.IncrementListeners();
                 }
             }
@@ -281,7 +319,18 @@ namespace EncompassRest
             var existing = field;
             if (!ReferenceEquals(existing, value))
             {
-                field = value != null ? new DirtyList<T>(value) : null;
+                if (AttributeChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs(propertyName);
+                    AttributeChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                    field = value != null ? new DirtyList<T>(value) : null;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    field = value != null ? new DirtyList<T>(value) : null;
+                }
                 if (_listeners > 0)
                 {
                     if (_propertiesAttributeLookup.TryGetValue(propertyName, out var wrapper))
@@ -291,29 +340,32 @@ namespace EncompassRest
                             foreach (var item in existingList)
                             {
                                 item.DecrementListeners();
-                                item.AttributeChanged -= wrapper.OnAttributeChanged;
+                                item.AttributeChanging -= wrapper.OnAttributeChanging;
                             }
+                            existing.CollectionChanging -= wrapper.OnCollectionChanging;
                             existing.CollectionChanged -= wrapper.OnCollectionChanged;
                         }
                         if (value != null)
                         {
                             foreach (var item in field as IEnumerable<DirtyExtensibleObject>)
                             {
-                                item.AttributeChanged += wrapper.OnAttributeChanged;
+                                item.AttributeChanging += wrapper.OnAttributeChanging;
                                 item.IncrementListeners();
                             }
+                            field.CollectionChanging += wrapper.OnCollectionChanging;
                             field.CollectionChanged += wrapper.OnCollectionChanged;
                         }
                     }
                     else if (value != null)
                     {
-                        wrapper = new AttributeChangedWrapper(this, propertyName, field);
+                        wrapper = new AttributeChangingWrapper(this, propertyName, field);
                         _propertiesAttributeLookup.Add(propertyName, wrapper);
                         foreach (var item in field as IEnumerable<DirtyExtensibleObject>)
                         {
-                            item.AttributeChanged += wrapper.OnAttributeChanged;
+                            item.AttributeChanging += wrapper.OnAttributeChanging;
                             item.IncrementListeners();
                         }
+                        field.CollectionChanging += wrapper.OnCollectionChanging;
                         field.CollectionChanged += wrapper.OnCollectionChanged;
                     }
                 }
@@ -326,7 +378,18 @@ namespace EncompassRest
             var existing = field;
             if (base.SetField(ref field, value))
             {
-                field = value != null ? new DirtyDictionary<string, T>(value, StringComparer.OrdinalIgnoreCase) : null;
+                if (AttributeChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs(propertyName);
+                    AttributeChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                    field = value != null ? new DirtyDictionary<string, T>(value, StringComparer.OrdinalIgnoreCase) : null;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    field = value != null ? new DirtyDictionary<string, T>(value, StringComparer.OrdinalIgnoreCase) : null;
+                }
                 OnPropertyChanged(propertyName, existing, field);
             }
         }
@@ -341,8 +404,8 @@ namespace EncompassRest
                 if (_listeners > 0 && fieldValue is DirtyExtensibleObject fieldValueObj)
                 {
                     fieldValueObj.IncrementListeners();
-                    var wrapper = new AttributeChangedWrapper(this, propertyName);
-                    AttributeChanged += wrapper.OnAttributeChanged;
+                    var wrapper = new AttributeChangingWrapper(this, propertyName);
+                    AttributeChanging += wrapper.OnAttributeChanging;
                 }
                 field = fieldValue;
             }
@@ -359,9 +422,10 @@ namespace EncompassRest
                 {
                     if (!_propertiesAttributeLookup.TryGetValue(propertyName, out var wrapper))
                     {
-                        wrapper = new AttributeChangedWrapper(this, propertyName, fieldValue);
+                        wrapper = new AttributeChangingWrapper(this, propertyName, fieldValue);
                         _propertiesAttributeLookup.Add(propertyName, wrapper);
                     }
+                    fieldValue.CollectionChanging += wrapper.OnCollectionChanging;
                     fieldValue.CollectionChanged += wrapper.OnCollectionChanged;
                 }
                 field = fieldValue;
@@ -452,108 +516,85 @@ namespace EncompassRest
 #endif
     }
 
-    internal sealed class AttributeChangedEventArgs : EventArgs
+    internal sealed class AttributeChangingEventArgs : EventArgs
     {
-        public static AttributeChangedEventArgs CreateAdd(string propertyName, IList addedValues, int index) => new AttributeChangedEventArgs(propertyName, AttributeChangedAction.Add, null, addedValues, -1, index);
-
-        public static AttributeChangedEventArgs CreateRemove(string propertyName, IList removedValues, int index) => new AttributeChangedEventArgs(propertyName, AttributeChangedAction.Remove, removedValues, null, index, -1);
-
-        public static AttributeChangedEventArgs CreateReplace(string propertyName, object oldValue, object newValue) => new AttributeChangedEventArgs(propertyName, AttributeChangedAction.Replace, new OneItemList(oldValue), new OneItemList(newValue), -1, -1);
-
-        public static AttributeChangedEventArgs CreateReplace(string propertyName, IList oldValues, IList newValues, int index) => new AttributeChangedEventArgs(propertyName, AttributeChangedAction.Replace, oldValues, newValues, index, index);
-
-        public static AttributeChangedEventArgs CreateMove(string propertyName, IList items, int oldStartingIndex, int newStartingIndex) => new AttributeChangedEventArgs(propertyName, AttributeChangedAction.Move, items, items, oldStartingIndex, newStartingIndex);
-
-        public AttributeChangedAction Action { get; }
-
-        public IList OldValues { get; }
-
-        public IList NewValues { get; }
-
         public Stack<string> Path { get; }
 
-        public int OldStartingIndex { get; }
+        public LoanEntity? LoanEntity { get; set; }
 
-        public int NewStartingIndex { get; }
+        public Loan Loan { get; set; }
 
-        private AttributeChangedEventArgs(string propertyName, AttributeChangedAction action, IList oldValues, IList newValues, int oldStartingIndex, int newStartingIndex)
+        public AttributeChangingEventArgs()
         {
             Path = new Stack<string>();
-            Path.Push(propertyName);
-            Action = action;
-            OldValues = oldValues;
-            NewValues = newValues;
-            OldStartingIndex = oldStartingIndex;
-            NewStartingIndex = newStartingIndex;
         }
 
-        private sealed class OneItemList : IList
+        public AttributeChangingEventArgs(string propertyName)
+            : this()
         {
-            private readonly object _value;
+            Path.Push(propertyName);
+        }
 
-            public object this[int index]
+        public List<FieldDescriptorAndValue> GetFieldValues(bool checkChildEntities)
+        {
+            List<FieldDescriptorAndValue> fieldValues = null;
+            if (LoanEntity.HasValue)
             {
-                get => index == 0 ? _value : throw new ArgumentOutOfRangeException(nameof(index));
-                set => throw new NotSupportedException();
+                Traverse(LoanEntity.GetValueOrDefault());
             }
+            return fieldValues;
 
-            public bool IsFixedSize => true;
-
-            public bool IsReadOnly => true;
-
-            public int Count => 1;
-
-            public bool IsSynchronized => true;
-
-            public object SyncRoot => null;
-
-            public OneItemList(object value)
+            void Traverse(LoanEntity entity)
             {
-                _value = value;
-            }
-
-            public int Add(object value) => throw new NotSupportedException();
-
-            public void Clear() => throw new NotSupportedException();
-
-            public bool Contains(object value) => IndexOf(value) == 0;
-
-            public void CopyTo(Array array, int index) => array.SetValue(_value, index);
-
-            public IEnumerator GetEnumerator()
-            {
-                yield return _value;
-            }
-
-            public int IndexOf(object value)
-            {
-                if (value != null)
+                if (LoanFieldDescriptors.FieldMappings._entityFields.TryGetValue(entity, out var dictionary))
                 {
-                    if (_value != null)
+                    if (fieldValues == null)
                     {
-                        return value.Equals(_value) ? 0 : -1;
+                        fieldValues = new List<FieldDescriptorAndValue>();
+                    }
+                    foreach (var pair in dictionary)
+                    {
+                        fieldValues.Add(new FieldDescriptorAndValue(pair.Value, pair.Value._modelPath.GetValue(Loan)));
                     }
                 }
-                else if (_value == null)
+                if (checkChildEntities && LoanFieldDescriptors.s_childEntities.TryGetValue(entity, out var childEntities))
                 {
-                    return 0;
+                    foreach (var childEntity in childEntities)
+                    {
+                        Traverse(childEntity);
+                    }
                 }
-                return -1;
             }
+        }
 
-            public void Insert(int index, object value) => throw new NotSupportedException();
-
-            public void Remove(object value) => throw new NotSupportedException();
-
-            public void RemoveAt(int index) => throw new NotSupportedException();
+        public void CheckForFieldChange(List<FieldDescriptorAndValue> originalValues)
+        {
+            if (originalValues != null)
+            {
+                var comparer = EqualityComparer<object>.Default;
+                foreach (var descriptorAndValue in originalValues)
+                {
+                    var descriptor = descriptorAndValue.Descriptor;
+                    var currentValue = descriptor._modelPath.GetValue(Loan);
+                    if (!comparer.Equals(currentValue, descriptorAndValue.Value))
+                    {
+                        Loan.InvokeFieldChange(new FieldChangeEventArgs(descriptor.FieldId, new ReadOnlyLoanField(descriptor, Loan, descriptorAndValue.Value), new ReadOnlyLoanField(descriptor, Loan, currentValue)));
+                    }
+                }
+            }
         }
     }
 
-    internal enum AttributeChangedAction
+    internal struct FieldDescriptorAndValue
     {
-        Add = 0,
-        Remove = 1,
-        Replace = 2,
-        Move = 3
+        public FieldDescriptor Descriptor { get; }
+
+        public object Value { get; }
+
+        public FieldDescriptorAndValue(FieldDescriptor descriptor, object value)
+        {
+            Descriptor = descriptor;
+            Value = value;
+        }
     }
 }

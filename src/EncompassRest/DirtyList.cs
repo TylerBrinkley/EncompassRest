@@ -53,7 +53,18 @@ namespace EncompassRest
                         newObj.PropertyChanged += PropertyChangedHandler;
                     }
                 }
-                _list[index] = value;
+                if (CollectionChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                    CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                    _list[index] = value;
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    _list[index] = value;
+                }
                 CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, existing, index));
             }
         }
@@ -74,13 +85,15 @@ namespace EncompassRest
 
         public bool IsReadOnly => false;
 
+        public event EventHandler<AttributeChangingEventArgs> CollectionChanging;
+
         public event NotifyCollectionChangedEventHandler CollectionChanged;
 
         bool IList.IsFixedSize => ((IList)_list).IsFixedSize;
 
-        bool ICollection.IsSynchronized => ((IList)_list).IsSynchronized;
+        bool ICollection.IsSynchronized => ((ICollection)_list).IsSynchronized;
 
-        object ICollection.SyncRoot => ((IList)_list).SyncRoot;
+        object ICollection.SyncRoot => ((ICollection)_list).SyncRoot;
 
         object IList.this[int index] { get => this[index]; set => this[index] = ValidateValue(value); }
 
@@ -128,20 +141,37 @@ namespace EncompassRest
                         list.Add(item);
                     }
                 }
+
+                if (CollectionChanging != null)
+                {
+                    var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                    CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                    var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                    ClearInternal();
+                    attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+                }
+                else
+                {
+                    ClearInternal();
+                }
+                if (list != null)
+                {
+                    CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, list));
+                }
+            }
+
+            void ClearInternal()
+            {
                 if (s_tIsIIdentifiable)
                 {
                     for (var i = _list.Count - 1; i >= 0; --i)
                     {
-                        RemoveAtInternal(i);
+                        RemoveAtInternal(i, checkForFieldChange: false);
                     }
                 }
                 else
                 {
                     _list.Clear();
-                }
-                if (list != null)
-                {
-                    CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, list));
                 }
             }
         }
@@ -180,7 +210,18 @@ namespace EncompassRest
 
         public void Insert(int index, T item)
         {
-            _list.Insert(index, item);
+            if (CollectionChanging != null)
+            {
+                var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                _list.Insert(index, item);
+                attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+            }
+            else
+            {
+                _list.Insert(index, item);
+            }
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
             if (s_tIsIIdentifiable)
             {
@@ -224,13 +265,29 @@ namespace EncompassRest
             }
 
             var temp = _list[fromIndex];
-            var direction = fromIndex < toIndex ? 1 : -1;
-            for (var i = fromIndex; i != toIndex; i += direction)
+            if (CollectionChanging != null)
             {
-                _list[i] = _list[i + direction];
+                var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                MoveInternal();
+                attributeChangingEventArgs.CheckForFieldChange(fieldValues);
             }
-            _list[toIndex] = temp;
-            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, temp, toIndex, fromIndex));
+            else
+            {
+                MoveInternal();
+            }
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, temp._value, toIndex, fromIndex));
+
+            void MoveInternal()
+            {
+                var direction = fromIndex < toIndex ? 1 : -1;
+                for (var i = fromIndex; i != toIndex; i += direction)
+                {
+                    _list[i] = _list[i + direction];
+                }
+                _list[toIndex] = temp;
+            }
         }
 
         public bool Remove(T item)
@@ -246,11 +303,11 @@ namespace EncompassRest
 
         public void RemoveAt(int index)
         {
-            var item = RemoveAtInternal(index);
+            var item = RemoveAtInternal(index, checkForFieldChange: true);
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
         }
 
-        private T RemoveAtInternal(int index)
+        private T RemoveAtInternal(int index, bool checkForFieldChange)
         {
             var item = _list[index]._value;
             if (s_tIsIIdentifiable)
@@ -276,7 +333,18 @@ namespace EncompassRest
                     obj.PropertyChanged -= PropertyChangedHandler;
                 }
             }
-            _list.RemoveAt(index);
+            if (checkForFieldChange && CollectionChanging != null)
+            {
+                var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                _list.RemoveAt(index);
+                attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+            }
+            else
+            {
+                _list.RemoveAt(index);
+            }
             return item;
         }
 
@@ -327,6 +395,66 @@ namespace EncompassRest
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        void IDirtyList.AddRange(IList values, int start, int length)
+        {
+            if (!(values is IList<T> valuesAsT))
+            {
+                throw new ArgumentException($"must be of type {TypeData<T>.Type.Name}", nameof(values));
+            }
+
+            if (length == 0)
+            {
+                return;
+            }
+
+            var startIndex = Count;
+            if (CollectionChanging != null)
+            {
+                var attributeChangingEventArgs = new AttributeChangingEventArgs();
+                CollectionChanging?.Invoke(this, attributeChangingEventArgs);
+                var fieldValues = attributeChangingEventArgs.GetFieldValues(true);
+                AddRangeInternal();
+                attributeChangingEventArgs.CheckForFieldChange(fieldValues);
+            }
+            else
+            {
+                AddRangeInternal();
+            }
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, valuesAsT.Skip(start).Take(length).ToList(), startIndex));
+
+            void AddRangeInternal()
+            {
+                if (s_tIsIIdentifiable)
+                {
+                    var index = Count;
+                    for (var i = 0; i < length; ++i)
+                    {
+                        var value = valuesAsT[i + start];
+                        _list.Add(value);
+                        var obj = (DirtyExtensibleObject)(object)value;
+                        if (obj != null)
+                        {
+                            var id = ((IIdentifiable)obj)?.Id;
+                            if (!string.IsNullOrEmpty(id))
+                            {
+                                _dictionary[id] = index;
+                            }
+                            obj.PropertyChanged += PropertyChangedHandler;
+                        }
+                    }
+                    ++index;
+                }
+                else
+                {
+                    for (var i = 0; i < length; ++i)
+                    {
+                        var value = valuesAsT[i + start];
+                        _list.Add(value);
+                    }
+                }
+            }
+        }
 
         int IList.Add(object value)
         {

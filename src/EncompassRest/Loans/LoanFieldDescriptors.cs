@@ -29,6 +29,8 @@ namespace EncompassRest.Loans
             new KeyValuePair<string, ModelPathSettings>("Loan.CurrentApplication.Employment", new ModelPathSettings(new Dictionary<string, string> { { nameof(Employment.CurrentEmploymentIndicator), "true" } }))
         }, 1, name => JsonHelper.CamelCaseNamingStrategy.GetPropertyName(name.Replace("_", string.Empty), false));
 
+        internal static readonly ReadOnlyDictionary<LoanEntity, ReadOnlyCollection<LoanEntity>> s_childEntities;
+
         /// <summary>
         /// All basic field mappings. e.g. fields 2, VEND.X263, etc.
         /// </summary>
@@ -129,6 +131,17 @@ namespace EncompassRest.Loans
                                     var descriptor = new NonStandardFieldDescriptor(virtualFieldPattern.FieldId, CreateModelPath(string.Format(modelPathPattern, 1)), modelPathPattern, virtualFieldPattern.Description, virtualFieldPattern.Format, virtualFieldPattern.Options, readOnly: true, multiInstance: true);
                                     FieldPatternMappings.AddField(descriptor);
                                 }
+                            }
+                        }
+                    }
+
+                    using (var jsonStream = zip.GetEntry("ChildEntities.json").Open())
+                    {
+                        using (var sr = new StreamReader(jsonStream))
+                        {
+                            using (var jr = new JsonTextReader(sr))
+                            {
+                                s_childEntities = JsonHelper.DefaultPublicSerializer.Deserialize<ReadOnlyDictionary<LoanEntity, ReadOnlyCollection<LoanEntity>>>(jr);
                             }
                         }
                     }

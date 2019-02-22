@@ -14,6 +14,7 @@ namespace EncompassRest.Loans
     {
         internal readonly ConcurrentDictionary<string, FieldDescriptor> _standardFields = new ConcurrentDictionary<string, FieldDescriptor>(StringComparer.OrdinalIgnoreCase);
         internal readonly ConcurrentDictionary<string, FieldDescriptor> _virtualFields = new ConcurrentDictionary<string, FieldDescriptor>(StringComparer.OrdinalIgnoreCase);
+        internal readonly ConcurrentDictionary<LoanEntity, ConcurrentDictionary<string, FieldDescriptor>> _entityFields = new ConcurrentDictionary<LoanEntity, ConcurrentDictionary<string, FieldDescriptor>>();
 
         /// <summary>
         /// Gets or sets the loan field mapping for the specified field id. e.g. HMDA.X32 => Loan.Hmda.Income, VEND.X263 => Loan.Contacts[(ContactType == 'INVESTOR')].Name
@@ -38,7 +39,15 @@ namespace EncompassRest.Loans
                 Preconditions.NotNullOrEmpty(value, nameof(value));
 
                 var descriptor = CreateFieldDescriptor(fieldId, value, true);
-                (descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields)[fieldId] = descriptor;
+                if (!TryAddInternal(fieldId, descriptor))
+                {
+                    if (TryGetDescriptor(fieldId, out var existing) && existing.LoanEntity.HasValue && _entityFields.TryGetValue(existing.LoanEntity.GetValueOrDefault(), out var dictionary))
+                    {
+                        dictionary.TryRemove(fieldId, out _);
+                    }
+                    (descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields)[fieldId] = descriptor;
+                    TryAddToEntityFields(fieldId, descriptor);
+                }
             }
         }
 
@@ -84,10 +93,20 @@ namespace EncompassRest.Loans
             Preconditions.NotNullOrEmpty(modelPath, nameof(modelPath));
 
             var descriptor = CreateFieldDescriptor(fieldId, modelPath, validatePathExists);
-            return (descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields).TryAdd(fieldId, descriptor);
+            return TryAddInternal(fieldId, descriptor);
         }
 
-        internal void AddField(FieldDescriptor descriptor) => (descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields).TryAdd(descriptor.FieldId, descriptor);
+        internal void AddField(FieldDescriptor descriptor) => TryAddInternal(descriptor.FieldId, descriptor);
+
+        private bool TryAddInternal(string fieldId, FieldDescriptor descriptor)
+        {
+            if ((descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields).TryAdd(descriptor.FieldId, descriptor))
+            {
+                TryAddToEntityFields(fieldId, descriptor);
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>
         /// Indicates whether the specified field is contained within the collection.
@@ -130,6 +149,13 @@ namespace EncompassRest.Loans
 
             if (_standardFields.TryRemove(fieldId, out var descriptor) || _virtualFields.TryRemove(fieldId, out descriptor))
             {
+                if (descriptor.LoanEntity.HasValue)
+                {
+                    if (_entityFields.TryGetValue(descriptor.LoanEntity.GetValueOrDefault(), out var dictionary))
+                    {
+                        dictionary.TryRemove(fieldId, out _);
+                    }
+                }
                 modelPath = descriptor.ModelPath;
                 return true;
             }
@@ -182,8 +208,18 @@ namespace EncompassRest.Loans
                 var modelPath = modelPathFactory();
                 descriptor = CreateFieldDescriptor(fieldId, modelPath, true);
                 descriptor = (descriptor.Type == LoanFieldType.Virtual ? _virtualFields : _standardFields).GetOrAdd(fieldId, descriptor);
+                TryAddToEntityFields(fieldId, descriptor);
             }
             return descriptor.ModelPath;
+        }
+
+        private void TryAddToEntityFields(string fieldId, FieldDescriptor descriptor)
+        {
+            if (descriptor.LoanEntity.HasValue)
+            {
+                var dictionary = _entityFields.GetOrAdd(descriptor.LoanEntity.GetValueOrDefault(), e => new ConcurrentDictionary<string, FieldDescriptor>(StringComparer.OrdinalIgnoreCase));
+                dictionary.GetOrAdd(fieldId, descriptor);
+            }
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
