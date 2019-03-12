@@ -19,6 +19,8 @@ namespace EncompassRest.Organizations
         private DirtyValue<StringEnumValue<StatutoryStatusMarylandType>> _statutoryStatusMarylandType;
         private DirtyValue<bool?> _useCustomLenderProfileForECS;
         private DirtyList<StateLicenseExtType> _stateLicenseExtTypes;
+        private DirtyValue<int?> _allowLoansWithIssues;
+        private DirtyValue<string> _msgUploadNonApprovedLoans;
 
         /// <summary>
         /// Indicates the organization qualifies as an exempt creditor and displays a description.
@@ -59,5 +61,15 @@ namespace EncompassRest.Organizations
         /// Objects containing the licenses that apply to your organization.
         /// </summary>
         public IList<StateLicenseExtType> StateLicenseExtTypes { get => GetField(ref _stateLicenseExtTypes); set => SetField(ref _stateLicenseExtTypes, value); }
+
+        /// <summary>
+        /// LicenseInformation AllowLoansWithIssues
+        /// </summary>
+        public int? AllowLoansWithIssues { get => _allowLoansWithIssues; set => SetField(ref _allowLoansWithIssues, value); }
+
+        /// <summary>
+        /// LicenseInformation MsgUploadNonApprovedLoans
+        /// </summary>
+        public string MsgUploadNonApprovedLoans { get => _msgUploadNonApprovedLoans; set => SetField(ref _msgUploadNonApprovedLoans, value); }
     }
 }

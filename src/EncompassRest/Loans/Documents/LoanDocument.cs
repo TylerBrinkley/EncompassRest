@@ -54,6 +54,18 @@ namespace EncompassRest.Loans.Documents
         private DirtyList<EntityReference> _roles;
         private DirtyValue<string> _titleWithIndex;
         private DirtyList<EntityReference> _conditions;
+        private DirtyValue<bool?> _isProtected;
+        private DirtyValue<bool?> _isRequired;
+        private DirtyValue<bool?> _attachmentRequired;
+        private DirtyValue<bool?> _isClosingDocument;
+        private DirtyValue<bool?> _isPreClosingDocument;
+        private DirtyValue<bool?> _isEDisclosuresDocument;
+        private DirtyValue<bool?> _isSettlementServicesDocument;
+        private DirtyValue<bool?> _hasIncomeVerifications;
+        private DirtyValue<bool?> _hasObligationVerifications;
+        private DirtyValue<bool?> _hasAssetVerifications;
+        private DirtyValue<bool?> _hasEmploymentVerifications;
+        private DirtyList<string> _docGroups;
 
         /// <summary>
         /// LoanDocument DocumentId.
@@ -269,6 +281,66 @@ namespace EncompassRest.Loans.Documents
         /// LoanDocument Conditions.
         /// </summary>
         public IList<EntityReference> Conditions { get => GetField(ref _conditions); set => SetField(ref _conditions, value); }
+
+        /// <summary>
+        /// LoanDocument IsProtected
+        /// </summary>
+        public bool? IsProtected { get => _isProtected; set => SetField(ref _isProtected, value); }
+
+        /// <summary>
+        /// LoanDocument IsRequired
+        /// </summary>
+        public bool? IsRequired { get => _isRequired; set => SetField(ref _isRequired, value); }
+
+        /// <summary>
+        /// LoanDocument AttachmentRequired
+        /// </summary>
+        public bool? AttachmentRequired { get => _attachmentRequired; set => SetField(ref _attachmentRequired, value); }
+
+        /// <summary>
+        /// LoanDocument IsClosingDocument
+        /// </summary>
+        public bool? IsClosingDocument { get => _isClosingDocument; set => SetField(ref _isClosingDocument, value); }
+
+        /// <summary>
+        /// LoanDocument IsPreClosingDocument
+        /// </summary>
+        public bool? IsPreClosingDocument { get => _isPreClosingDocument; set => SetField(ref _isPreClosingDocument, value); }
+
+        /// <summary>
+        /// LoanDocument IsEDisclosuresDocument
+        /// </summary>
+        public bool? IsEDisclosuresDocument { get => _isEDisclosuresDocument; set => SetField(ref _isEDisclosuresDocument, value); }
+
+        /// <summary>
+        /// LoanDocument IsSettlementServicesDocument
+        /// </summary>
+        public bool? IsSettlementServicesDocument { get => _isSettlementServicesDocument; set => SetField(ref _isSettlementServicesDocument, value); }
+
+        /// <summary>
+        /// LoanDocument HasIncomeVerifications
+        /// </summary>
+        public bool? HasIncomeVerifications { get => _hasIncomeVerifications; set => SetField(ref _hasIncomeVerifications, value); }
+
+        /// <summary>
+        /// LoanDocument HasObligationVerifications
+        /// </summary>
+        public bool? HasObligationVerifications { get => _hasObligationVerifications; set => SetField(ref _hasObligationVerifications, value); }
+
+        /// <summary>
+        /// LoanDocument HasAssetVerifications
+        /// </summary>
+        public bool? HasAssetVerifications { get => _hasAssetVerifications; set => SetField(ref _hasAssetVerifications, value); }
+
+        /// <summary>
+        /// LoanDocument HasEmploymentVerifications
+        /// </summary>
+        public bool? HasEmploymentVerifications { get => _hasEmploymentVerifications; set => SetField(ref _hasEmploymentVerifications, value); }
+
+        /// <summary>
+        /// LoanDocument DocGroups
+        /// </summary>
+        public IList<string> DocGroups { get => GetField(ref _docGroups); set => SetField(ref _docGroups, value); }
 
         [IdPropertyName(nameof(DocumentId))]
         string IIdentifiable.Id { get => DocumentId; set => DocumentId = value; }

@@ -154,7 +154,7 @@ namespace EncompassRest.Loans
                 { "CX.{0}", new StandardFieldInfo { FieldId = "CX.{0}", ModelPath = "Loan.CustomFields[(FieldName == 'CX.{0}')].StringValue", Format = LoanFieldFormat.STRING } },
                 { "CUST{0:00}FV", new StandardFieldInfo { FieldId = "CUST{0:00}FV", ModelPath = "Loan.CustomFields[(FieldName == 'CUST{0:00}FV')].StringValue", Format = LoanFieldFormat.STRING } }
             };
-            PopulateFieldMappings("Loan", "Loan", null, loanEntitySchema, null, entityTypes, fields, fieldPatterns, extendedFieldInfo: true, null, null, null);
+            PopulateFieldMappings("Loan", "Loan", loanEntitySchema, null, entityTypes, fields, fieldPatterns, extendedFieldInfo: true, null, null, null);
 
             foreach (var pair in FieldMappings._standardFields)
             {
@@ -215,9 +215,9 @@ namespace EncompassRest.Loans
             StandardFieldsLastRefreshedUtc = DateTime.UtcNow;
         }
 
-        internal delegate void PopulateFieldMappingsAction(string entityName, Type ellieType, EntitySchema entitySchema, HashSet<string> requiredProperties, bool serializeWholeList);
+        internal delegate void PopulateFieldMappingsAction(string entityName, EntitySchema entitySchema, HashSet<string> requiredProperties, bool serializeWholeList);
 
-        internal static void PopulateFieldMappings(string entityName, string currentPath, Type ellieType, EntitySchema entitySchema, EntitySchema previousEntitySchema, Dictionary<string, EntitySchema> entityTypes, Dictionary<string, StandardFieldInfo> fields, Dictionary<string, StandardFieldInfo> fieldPatterns, bool extendedFieldInfo, PopulateFieldMappingsAction action, Func<string, string> descriptionRetriever, TextWriter output)
+        internal static void PopulateFieldMappings(string entityName, string currentPath, EntitySchema entitySchema, EntitySchema previousEntitySchema, Dictionary<string, EntitySchema> entityTypes, Dictionary<string, StandardFieldInfo> fields, Dictionary<string, StandardFieldInfo> fieldPatterns, bool extendedFieldInfo, PopulateFieldMappingsAction action, Func<string, string> descriptionRetriever, TextWriter output)
         {
             var requiredProperties = new HashSet<string>();
             var serializeWholeList = false;
@@ -228,8 +228,6 @@ namespace EncompassRest.Loans
                 var propertyName = pair.Key;
                 var propertySchema = pair.Value;
                 var description = propertySchema.Description;
-                var ellieProperty = ellieType?.GetTypeInfo().GetDeclaredProperty(propertyName);
-                var elliePropertyType = ellieProperty?.PropertyType;
                 var fieldId = propertySchema.FieldId;
                 if (!string.IsNullOrEmpty(fieldId))
                 {
@@ -255,28 +253,12 @@ namespace EncompassRest.Loans
                 else if (propertySchema.Type == PropertySchemaType.Entity && entityTypes.TryGetValue(propertySchema.EntityType, out var nestedEntitySchema))
                 {
                     entityTypes.Remove(propertySchema.EntityType);
-                    if (ellieType?.Name == "LoanContract" && propertyName == "CurrentApplication")
-                    {
-                        elliePropertyType = ellieType.GetTypeInfo().GetDeclaredProperty("Applications").PropertyType.GetTypeInfo().ImplementedInterfaces.First(i => i.Name == "IEnumerable`1").GenericTypeArguments[0];
-                    }
-                    else if (ellieType != null && elliePropertyType == null)
-                    {
-                        output?.WriteLine($"Did not get ellie type for {currentPath}.{propertyName} of type {propertySchema.EntityType.Value}");
-                    }
-                    PopulateFieldMappings(propertySchema.EntityType, $"{currentPath}.{propertyName}", elliePropertyType, nestedEntitySchema, entitySchema, entityTypes, fields, fieldPatterns, extendedFieldInfo, action, descriptionRetriever, output);
+                    PopulateFieldMappings(propertySchema.EntityType, $"{currentPath}.{propertyName}", nestedEntitySchema, entitySchema, entityTypes, fields, fieldPatterns, extendedFieldInfo, action, descriptionRetriever, output);
                 }
                 else if ((propertySchema.Type == PropertySchemaType.List || propertySchema.Type == PropertySchemaType.Set) && entityTypes.TryGetValue(propertySchema.ElementType, out var elementEntitySchema))
                 {
                     entityTypes.Remove(propertySchema.ElementType);
-                    if (ellieProperty != null)
-                    {
-                        elliePropertyType = elliePropertyType.GetTypeInfo().ImplementedInterfaces.First(i => i.Name == "IEnumerable`1").GenericTypeArguments[0];
-                    }
-                    else if (ellieType != null)
-                    {
-                        output?.WriteLine($"Did not get ellie type for {currentPath}.{propertyName} of type {propertySchema.ElementType.Value}");
-                    }
-                    PopulateFieldMappings(propertySchema.ElementType, $"{currentPath}.{propertyName}", elliePropertyType, elementEntitySchema, entitySchema, entityTypes, fields, fieldPatterns, extendedFieldInfo, action, descriptionRetriever, output);
+                    PopulateFieldMappings(propertySchema.ElementType, $"{currentPath}.{propertyName}", elementEntitySchema, entitySchema, entityTypes, fields, fieldPatterns, extendedFieldInfo, action, descriptionRetriever, output);
                 }
                 else
                 {
@@ -504,7 +486,7 @@ namespace EncompassRest.Loans
                 }
             }
 
-            action?.Invoke(entityName, ellieType, entitySchema, requiredProperties, serializeWholeList);
+            action?.Invoke(entityName, entitySchema, requiredProperties, serializeWholeList);
         }
 
         private static LoanFieldFormat? GetFormat(PropertySchema propertySchema)

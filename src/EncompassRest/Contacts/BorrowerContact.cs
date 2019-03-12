@@ -1,5 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
+using EncompassRest.Utilities;
+using EnumsNET;
 using Newtonsoft.Json;
 
 namespace EncompassRest.Contacts
@@ -12,6 +14,7 @@ namespace EncompassRest.Contacts
         private DirtyValue<string> _employerName;
         private DirtyValue<DateTime?> _birthdate;
         private DirtyValue<string> _referral;
+        private DirtyValue<BorrowerContactType?> _borrowerType;
 
         /// <summary>
         /// The name of the contact's employer.
@@ -27,6 +30,12 @@ namespace EncompassRest.Contacts
         /// The name of a person or company, if any, who referred the borrower to you.
         /// </summary>
         public string Referral { get => _referral; set => SetField(ref _referral, value); }
+
+        /// <summary>
+        /// Borrower type
+        /// </summary>
+        [EnumFormat(EnumFormat.DecimalValue)]
+        public BorrowerContactType? BorrowerType { get => _borrowerType; set => SetField(ref _borrowerType, value); }
 
         internal override string ApiPath => "encompass/v1/borrowerContacts";
 

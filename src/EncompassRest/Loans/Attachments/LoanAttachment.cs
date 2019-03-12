@@ -29,6 +29,8 @@ namespace EncompassRest.Loans.Attachments
         private DirtyValue<string> _fileWithExtension;
         private DirtyValue<EntityReference> _document;
         private NeverSerializeValue<string> _mediaUrl;
+        private DirtyValue<bool?> _isRemoved;
+        private DirtyValue<string> _callBackUrl;
 
         /// <summary>
         /// The unique identifier assigned to the attachment.
@@ -102,6 +104,16 @@ namespace EncompassRest.Loans.Attachments
         /// The location or path where the media attachment is located.
         /// </summary>
         public string MediaUrl { get => _mediaUrl; set => SetField(ref _mediaUrl, value); }
+
+        /// <summary>
+        /// LoanAttachment IsRemoved
+        /// </summary>
+        public bool? IsRemoved { get => _isRemoved; set => SetField(ref _isRemoved, value); }
+
+        /// <summary>
+        /// LoanAttachment CallBackUrl
+        /// </summary>
+        public string CallBackUrl { get => _callBackUrl; set => SetField(ref _callBackUrl, value); }
 
         [IdPropertyName(nameof(AttachmentId))]
         string IIdentifiable.Id { get => AttachmentId; set => AttachmentId = value; }

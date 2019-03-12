@@ -41,7 +41,7 @@
         /// <summary>
         /// The vertical resolution of the image or thumbnail.
         /// </summary>
-        public float? VeriticalResolution { get => _verticalResolution; set => SetField(ref _verticalResolution, value); }
+        public float? VerticalResolution { get => _verticalResolution; set => SetField(ref _verticalResolution, value); }
 
         /// <summary>
         /// The location or path where the media attachment is located.

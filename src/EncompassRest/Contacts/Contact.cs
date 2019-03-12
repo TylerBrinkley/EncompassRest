@@ -29,6 +29,9 @@ namespace EncompassRest.Contacts
         private DirtyValue<string> _salutation;
         private DirtyValue<string> _id;
         private DirtyList<int?> _groupIDs;
+        private DirtyValue<string> _primaryEmail;
+        private DirtyValue<string> _primaryPhone;
+        private Address _bizAddress;
 
         /// <summary>
         /// The contact's first name.
@@ -110,6 +113,21 @@ namespace EncompassRest.Contacts
         /// Contact GroupIDs
         /// </summary>
         public IList<int?> GroupIDs { get => GetField(ref _groupIDs); set => SetField(ref _groupIDs, value); }
+
+        /// <summary>
+        /// Contact PrimaryEmail
+        /// </summary>
+        public string PrimaryEmail { get => _primaryEmail; set => SetField(ref _primaryEmail, value); }
+
+        /// <summary>
+        /// Contact PrimaryPhone
+        /// </summary>
+        public string PrimaryPhone { get => _primaryPhone; set => SetField(ref _primaryPhone, value); }
+
+        /// <summary>
+        /// Contact BizAddress
+        /// </summary>
+        public Address BizAddress { get => GetField(ref _bizAddress); set => SetField(ref _bizAddress, value); }
 
         internal abstract string ApiPath { get; }
 

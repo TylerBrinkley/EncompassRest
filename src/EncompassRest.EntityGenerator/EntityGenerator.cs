@@ -6,9 +6,22 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Elli.Api.Contacts.Model;
+using Elli.Api.Loans.EFolder.Model;
 using Elli.Api.Loans.Model;
+using Elli.Api.Settings.Model;
+using EncompassRest.Company;
+using EncompassRest.Company.Users;
+using EncompassRest.Contacts;
 using EncompassRest.Loans;
+using EncompassRest.Loans.Attachments;
+using EncompassRest.Loans.Conditions;
+using EncompassRest.Loans.Documents;
 using EncompassRest.Loans.Enums;
+using EncompassRest.Loans.MilestoneFreeRoles;
+using EncompassRest.Loans.Milestones;
+using EncompassRest.Organizations;
+using EncompassRest.ResourceLocks;
 using EncompassRest.Schema;
 using EncompassRest.Tests;
 using EnumsNET;
@@ -275,6 +288,29 @@ namespace EncompassRest
         {
             try
             {
+                var dictionary = new Dictionary<Type, Type>
+                {
+                    { typeof(Loan), typeof(LoanContract) },
+                    { typeof(BorrowerContact), typeof(BorrowerContactContract) },
+                    { typeof(BusinessContact), typeof(BusinessContactContract) },
+                    { typeof(LoanAttachment), typeof(EFolderAttachmentContract) },
+                    { typeof(LoanDocument), typeof(EFolderDocumentContract) },
+                    { typeof(PostClosingCondition), typeof(EFolderPostClosingConditionContract) },
+                    { typeof(PreliminaryCondition), typeof(EFolderPreliminaryConditionContract) },
+                    { typeof(UnderwritingCondition), typeof(EFolderUnderwritingConditionContract) },
+                    { typeof(LoanMetadata), typeof(LoanMetadataContract) },
+                    { typeof(LoanMilestone), typeof(MilestoneContract) },
+                    { typeof(LoanMilestoneFreeRole), typeof(MilestoneFreeRoleContract) },
+                    { typeof(ResourceLock), typeof(ResourceLockContract) },
+                    { typeof(CompensationPlans), typeof(CompensationPlanContract) },
+                    { typeof(User), typeof(UserContract) },
+                    { typeof(Organization), typeof(OrganizationInfoContract) }
+                };
+                foreach (var pair in dictionary)
+                {
+                    ObjectModelComparer.Compare(pair.Key, "EncompassRest", pair.Value, "Ellie .NET Bindings", Console.Out, propertyName => propertyName != "ExtensionData", GetBasicType);
+                }
+
                 Dictionary<string, EntitySchema> entityTypes;
                 using (var client = await TestBaseClass.GetTestClientAsync().ConfigureAwait(false))
                 {
@@ -306,6 +342,7 @@ namespace EncompassRest
                     if (entityTypes.ContainsKey(entityName))
                     {
                         Console.WriteLine($"Can now retrieve schema for {entityName}");
+                        entityTypes[entityName] = pair.Value;
                     }
                     else
                     {
@@ -323,6 +360,7 @@ namespace EncompassRest
                         if (properties.ContainsKey(propertyName))
                         {
                             Console.WriteLine($"Can now retrieve schema property {entityName}.{propertyName}");
+                            properties[propertyName] = p.Value;
                         }
                         else
                         {
@@ -359,7 +397,7 @@ namespace EncompassRest
 
                 var otherEnums = new Dictionary<string, Dictionary<string, string>>();
 
-                LoanFieldDescriptors.PopulateFieldMappings("Loan", "Loan", typeof(LoanContract), loanEntitySchema, null, entityTypes, fields, fieldPatterns, extendedFieldInfo: false, (string entityName, Type ellieType, EntitySchema entitySchema, HashSet<string> requiredProperties, bool serializeWholeList) => GenerateClassFileFromSchema(destinationPath, @namespace, entityName, ellieType, entitySchema, otherEnums, requiredProperties, serializeWholeList), fieldId => EllieMae.Encompass.BusinessObjects.Loans.FieldDescriptors.StandardFields[fieldId].Description, Console.Out);
+                LoanFieldDescriptors.PopulateFieldMappings("Loan", "Loan", loanEntitySchema, null, entityTypes, fields, fieldPatterns, extendedFieldInfo: false, (string entityName, EntitySchema entitySchema, HashSet<string> requiredProperties, bool serializeWholeList) => GenerateClassFileFromSchema(destinationPath, @namespace, entityName, entitySchema, otherEnums, requiredProperties, serializeWholeList), fieldId => EllieMae.Encompass.BusinessObjects.Loans.FieldDescriptors.StandardFields[fieldId].Description, Console.Out);
 
                 entityTypes.Remove("Loan");
 
@@ -369,7 +407,7 @@ namespace EncompassRest
                     if (!s_ignoredEntities.Contains(entityName))
                     {
                         Console.WriteLine($"{entityName} is not connected to the Loan schema");
-                        GenerateClassFileFromSchema(destinationPath, @namespace, entityName, null, pair.Value, otherEnums, null, false);
+                        GenerateClassFileFromSchema(destinationPath, @namespace, entityName, pair.Value, otherEnums, null, false);
                     }
                 }
 
@@ -518,6 +556,43 @@ namespace EncompassRest
             Console.ReadLine();
         }
 
+        private static BasicType GetBasicType(Type type)
+        {
+            var nonNullableType = Nullable.GetUnderlyingType(type) ?? type;
+            var typeCode = Type.GetTypeCode(nonNullableType);
+            switch (typeCode)
+            {
+                case TypeCode.Boolean:
+                    return BasicType.Boolean;
+                case TypeCode.Byte:
+                case TypeCode.Decimal:
+                case TypeCode.Double:
+                case TypeCode.Int16:
+                case TypeCode.Int32:
+                case TypeCode.Int64:
+                case TypeCode.SByte:
+                case TypeCode.Single:
+                case TypeCode.UInt16:
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
+                    return BasicType.Numeric;
+                case TypeCode.DateTime:
+                    return BasicType.DateTime;
+                case TypeCode.String:
+                case TypeCode.Char:
+                    return BasicType.String;
+            }
+            if (nonNullableType == typeof(DateTimeOffset))
+            {
+                return BasicType.DateTime;
+            }
+            if (nonNullableType == typeof(Guid) || nonNullableType == typeof(NA<decimal>) || nonNullableType == typeof(TimeSpan) || (nonNullableType.IsGenericType && nonNullableType.GetGenericTypeDefinition() == typeof(StringEnumValue<>)))
+            {
+                return BasicType.String;
+            }
+            return BasicType.Object;
+        }
+
         private static void GenerateClassesFromJson(string destinationPath, string @namespace, string entityName, JObject jObject, HashSet<string> names, string nameSuffix = null)
         {
             var systemNamespace = false;
@@ -625,7 +700,7 @@ namespace EncompassRest
             }
         }
 
-        private static void GenerateClassFileFromSchema(string destinationPath, string @namespace, string entityName, Type ellieType, EntitySchema entitySchema, Dictionary<string, Dictionary<string, string>> otherEnums, HashSet<string> requiredProperties, bool serializeWholeList)
+        private static void GenerateClassFileFromSchema(string destinationPath, string @namespace, string entityName, EntitySchema entitySchema, Dictionary<string, Dictionary<string, string>> otherEnums, HashSet<string> requiredProperties, bool serializeWholeList)
         {
             var sb = new StringBuilder();
 
@@ -644,17 +719,6 @@ namespace EncompassRest
             var enumsNamespace = false;
             var schemaNamespace = false;
 
-            if (ellieType != null)
-            {
-                foreach (var property in ellieType.GetProperties())
-                {
-                    if (!entitySchema.Properties.Any(p => string.Equals(p.Key.Replace("_", string.Empty), property.Name.Replace("_", string.Empty), StringComparison.OrdinalIgnoreCase)))
-                    {
-                        Console.WriteLine($"EncompassRest missing {ellieType.Name}.{property.Name} on {entityName}");
-                    }
-                }
-            }
-
             var fields = new StringBuilder();
             var properties = new StringBuilder();
 
@@ -662,15 +726,6 @@ namespace EncompassRest
             {
                 var propertyName = pair.Key.Replace("_", string.Empty);
                 var entityPropertyName = $"{entityName}.{propertyName}";
-                if (ellieType != null)
-                {
-                    var ellieProperty = ellieType.GetProperties().FirstOrDefault(p => string.Equals(propertyName, p.Name.Replace("_", string.Empty), StringComparison.OrdinalIgnoreCase));
-                    var elliePropertyType = ellieProperty?.PropertyType;
-                    if (ellieProperty == null)
-                    {
-                        Console.WriteLine($"Ellie missing {entityName}.{propertyName}");
-                    }
-                }
                 if (!s_propertiesToNotGenerate.Contains(entityPropertyName))
                 {
                     var propertySchema = pair.Value;

@@ -39,7 +39,7 @@ namespace EncompassRest.Loans.Conditions
         /// <summary>
         /// Whether the condition's status is Cleared.
         /// </summary>
-        private bool? IsCleared { get => _isCleared; set => SetField(ref _isCleared, value); }
+        public bool? IsCleared { get => _isCleared; set => SetField(ref _isCleared, value); }
 
         /// <summary>
         /// Date and time the condition was cleared.

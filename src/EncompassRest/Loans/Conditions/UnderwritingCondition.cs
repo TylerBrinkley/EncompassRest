@@ -29,6 +29,9 @@ namespace EncompassRest.Loans.Conditions
         private DirtyValue<bool?> _isWaived;
         private DirtyValue<DateTime?> _waivedDate;
         private DirtyValue<EntityReference> _waivedBy;
+        private DirtyValue<string> _owner;
+        private DirtyValue<string> _tpoConditionDocType;
+        private DirtyValue<string> _tpoConditionDocGuid;
 
         /// <summary>
         /// The milestones to describe when the condition must be satisfied.
@@ -139,5 +142,20 @@ namespace EncompassRest.Loans.Conditions
         /// Information about the Encompass user who waived the condition.
         /// </summary>
         public EntityReference WaivedBy { get => _waivedBy; set => SetField(ref _waivedBy, value); }
+
+        /// <summary>
+        /// UnderwritingCondition Owner
+        /// </summary>
+        public string Owner { get => _owner; set => SetField(ref _owner, value); }
+
+        /// <summary>
+        /// UnderwritingCondition TpoConditionDocType
+        /// </summary>
+        public string TpoConditionDocType { get => _tpoConditionDocType; set => SetField(ref _tpoConditionDocType, value); }
+
+        /// <summary>
+        /// UnderwritingCondition TpoConditionDocGuid
+        /// </summary>
+        public string TpoConditionDocGuid { get => _tpoConditionDocGuid; set => SetField(ref _tpoConditionDocGuid, value); }
     }
 }
