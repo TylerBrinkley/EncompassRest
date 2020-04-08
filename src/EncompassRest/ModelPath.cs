@@ -19,7 +19,7 @@ namespace EncompassRest
 
         public IReadOnlyList<PathSegment> Segments { get; }
 
-        internal ModelPath(ModelPathContext context, string modelPath)
+        internal ModelPath(ModelPathContext context, string modelPath, bool includesRootObjectName)
         {
             Context = context;
             var segments = new List<PathSegment>();
@@ -28,17 +28,21 @@ namespace EncompassRest
             while (i < modelPath.Length)
             {
                 var c = modelPath[i];
+                if (!includesRootObjectName && i == 0)
+                {
+                    --i;
+                    c = '.';
+                }
                 switch (c)
                 {
                     case '[':
-                        if (RootObjectName == null)
+                        if (includesRootObjectName && RootObjectName == null)
                         {
                             RootObjectName = modelPath.Substring(0, i);
                         }
                         Increment(ref i);
                         c = modelPath[i];
                         int? index;
-                        string propertyName;
                         switch (c)
                         {
                             case '(':
@@ -48,12 +52,13 @@ namespace EncompassRest
                                 ObjectFilter? filter = null;
                                 while (c != ')')
                                 {
+                                    string filterPath;
                                     switch (c)
                                     {
                                         case '\'':
                                             Increment(ref i);
-                                            propertyName = GetPropertyName(ref i);
-                                            if (string.IsNullOrEmpty(propertyName))
+                                            filterPath = GetPropertyName(ref i);
+                                            if (string.IsNullOrEmpty(filterPath))
                                             {
                                                 throw new ArgumentException("bad path");
                                             }
@@ -61,7 +66,7 @@ namespace EncompassRest
                                             break;
                                         default:
                                             var s = i;
-                                            while (char.IsLetterOrDigit(c) || c == '_')
+                                            while (c != '=')
                                             {
                                                 Increment(ref i);
                                                 c = modelPath[i];
@@ -70,9 +75,10 @@ namespace EncompassRest
                                             {
                                                 throw new ArgumentException("bad path");
                                             }
-                                            propertyName = modelPath.Substring(s, i - s);
+                                            filterPath = modelPath.Substring(s, i - s);
                                             break;
                                     }
+                                    var filterModelPath = new ModelPath(context, filterPath, includesRootObjectName: false);
                                     EatWhiteSpace(ref i);
                                     if (modelPath[i] != '=')
                                     {
@@ -100,7 +106,7 @@ namespace EncompassRest
                                             var integerValue = 0;
                                             while (char.IsDigit(c))
                                             {
-                                                integerValue = integerValue * 10 + (c - '0');
+                                                integerValue = (integerValue * 10) + (c - '0');
                                                 Increment(ref i);
                                                 c = modelPath[i];
                                             }
@@ -111,7 +117,7 @@ namespace EncompassRest
                                             value = integerValue.ToString();
                                             break;
                                     }
-                                    var propertyFilter = new PropertyFilter(propertyName, value);
+                                    var propertyFilter = new PropertyFilter(filterModelPath, value);
                                     EatWhiteSpace(ref i);
                                     c = modelPath[i];
                                     if (c == '&')
@@ -148,7 +154,7 @@ namespace EncompassRest
                                     index = 0;
                                     while (char.IsDigit(c))
                                     {
-                                        index = index * 10 + (c - '0');
+                                        index = (index * 10) + (c - '0');
                                         Increment(ref i);
                                         c = modelPath[i];
                                     }
@@ -163,7 +169,7 @@ namespace EncompassRest
                                 throw new ArgumentException("no empty brackets");
                             case '\'':
                                 Increment(ref i);
-                                propertyName = GetPropertyName(ref i);
+                                var propertyName = GetPropertyName(ref i);
                                 if (string.IsNullOrEmpty(propertyName))
                                 {
                                     throw new ArgumentException("bad path");
@@ -179,7 +185,7 @@ namespace EncompassRest
                                 index = 0;
                                 while (char.IsDigit(c))
                                 {
-                                    index = index * 10 + (c - '0');
+                                    index = (index * 10) + (c - '0');
                                     Increment(ref i);
                                     c = modelPath[i];
                                 }
@@ -192,13 +198,13 @@ namespace EncompassRest
                         }
                         break;
                     case '.':
-                        if (RootObjectName == null)
+                        if (includesRootObjectName && RootObjectName == null)
                         {
                             RootObjectName = modelPath.Substring(0, i);
                         }
                         Increment(ref i);
                         start = i;
-                        while (i < modelPath.Length && char.IsLetterOrDigit((c = modelPath[i])) || c == '_')
+                        while (i < modelPath.Length && (char.IsLetterOrDigit((c = modelPath[i])) || c == '_'))
                         {
                             ++i;
                         }
@@ -212,7 +218,7 @@ namespace EncompassRest
                 }
                 ++i;
             }
-            if (RootObjectName == null)
+            if (includesRootObjectName && RootObjectName == null)
             {
                 throw new ArgumentException("bad path");
             }
@@ -365,9 +371,13 @@ namespace EncompassRest
 
         public override string ToString() => ToString(null, false);
 
-        public string ToString(Func<string?, string>? propertyNameTransformer, bool attributePath) => $"{(attributePath ? null : propertyNameTransformer?.Invoke(RootObjectName) ?? RootObjectName)}{string.Concat(Segments.Select(segment => segment.ToString(propertyNameTransformer, attributePath)))}";
+        public string ToString(Func<string, string>? propertyNameTransformer, bool attributePath)
+        {
+            var str = $"{(attributePath || RootObjectName == null ? null : propertyNameTransformer?.Invoke(RootObjectName) ?? RootObjectName)}{string.Concat(Segments.Select(segment => segment.ToString(propertyNameTransformer, attributePath)))}";
+            return RootObjectName == null ? str.Substring(1) : str;
+        }
 
-        public override int GetHashCode() => Segments.Aggregate(StringComparer.OrdinalIgnoreCase.GetHashCode(RootObjectName), (current, segment) => current ^ segment.GetHashCode());
+        public override int GetHashCode() => Segments.Aggregate(RootObjectName != null ? StringComparer.OrdinalIgnoreCase.GetHashCode(RootObjectName) : 0, (current, segment) => current ^ segment.GetHashCode());
 
         public override bool Equals(object? obj) => Equals(obj as ModelPath);
 
@@ -500,7 +510,7 @@ namespace EncompassRest
                             }
                         }
                         break;
-                    case JsonLinqContract linqContract:
+                    case JsonLinqContract _:
                         if (parent is JObject jObject)
                         {
                             if (jObject.TryGetValue(propertyName, StringComparison.OrdinalIgnoreCase, out tokenValue))
@@ -561,7 +571,7 @@ namespace EncompassRest
                             objectContract.ExtensionDataSetter?.Invoke(parent, propertyName, value);
                         }
                         break;
-                    case JsonLinqContract linqContract:
+                    case JsonLinqContract _:
                         if (parent is JObject jObject)
                         {
                             value = valueProvider(null);
@@ -679,7 +689,7 @@ namespace EncompassRest
                         sb.Append('{');
                         foreach (var propertyFilter in Filter)
                         {
-                            var propertyName = Path.Context.PropertyNameTransformer?.Invoke(propertyFilter.PropertyName) ?? propertyFilter.PropertyName;
+                            var propertyName = Path.Context.PropertyNameTransformer?.Invoke(propertyFilter.PropertyPath.ToString()) ?? propertyFilter.PropertyPath.ToString();
                             sb.Append('"').Append(propertyName).Append(@""":");
                             sb.Append('"').Append(propertyFilter.Value).Append(@""",");
                         }
@@ -736,7 +746,7 @@ namespace EncompassRest
                 var propertyPath = GetPropertyPath();
                 Path.Context.Settings.TryGetValue(propertyPath, out var settings);
                 var propertyFilters = CreatePropertyFilterListWithDefaults(settings?.DefaultValues);
-                return propertyFilters.Aggregate(Index ?? settings?.IndexOffset ?? Path.Context.DefaultIndexOffset, (current, f) => current ^ StringComparer.OrdinalIgnoreCase.GetHashCode(f.PropertyName) ^ StringComparer.OrdinalIgnoreCase.GetHashCode(f.Value));
+                return propertyFilters.Aggregate(Index ?? settings?.IndexOffset ?? Path.Context.DefaultIndexOffset, (current, f) => current ^ f.PropertyPath.GetHashCode() ^ StringComparer.OrdinalIgnoreCase.GetHashCode(f.Value));
             }
 
             public override bool Equals(PathSegment? other)
@@ -751,11 +761,7 @@ namespace EncompassRest
                         var defaultValues = settings?.DefaultValues;
                         var firstFilters = CreatePropertyFilterListWithDefaults(defaultValues);
                         var secondFilters = arraySegment.CreatePropertyFilterListWithDefaults(defaultValues);
-                        if (firstFilters.Count != secondFilters.Count)
-                        {
-                            return false;
-                        }
-                        return firstFilters.All(f => secondFilters.Any(sf => string.Equals(sf.PropertyName, f.PropertyName, StringComparison.OrdinalIgnoreCase) && string.Equals(sf.Value, f.Value, StringComparison.OrdinalIgnoreCase)));
+                        return firstFilters.Count == secondFilters.Count && firstFilters.All(f => secondFilters.Any(sf => sf.PropertyPath.Equals(f.PropertyPath) && string.Equals(sf.Value, f.Value, StringComparison.OrdinalIgnoreCase)));
                     }
                 }
                 return false;
@@ -768,9 +774,9 @@ namespace EncompassRest
                 {
                     foreach (var pair in defaultValues)
                     {
-                        if (!filters.Any(f => string.Equals(f.PropertyName, pair.Key, StringComparison.OrdinalIgnoreCase) && string.Equals(f.Value, pair.Value, StringComparison.OrdinalIgnoreCase)))
+                        if (!filters.Any(f => string.Equals(f.PropertyPath.ToString(), pair.Key, StringComparison.OrdinalIgnoreCase) && string.Equals(f.Value, pair.Value, StringComparison.OrdinalIgnoreCase)))
                         {
-                            filters.Add(new PropertyFilter(pair.Key, pair.Value));
+                            filters.Add(new PropertyFilter(new ModelPath(Path.Context, pair.Key, includesRootObjectName: false), pair.Value));
                         }
                     }
                 }
@@ -810,7 +816,7 @@ namespace EncompassRest
 
             public sealed override string ToString() => ToString(null, false);
 
-            public virtual string ToString(Func<string, string>? propertyNameTransformer, bool attributePath) => string.Join(" && ", _terms.Where(term => term.PropertyName != "Id").Select(term => term.ToString(propertyNameTransformer, attributePath)));
+            public virtual string ToString(Func<string, string>? propertyNameTransformer, bool attributePath) => string.Join(" && ", _terms.Where(term => term.PropertyPath.ToString() != "Id").Select(term => term.ToString(propertyNameTransformer, attributePath)));
 
             public IEnumerator<PropertyFilter> GetEnumerator()
             {
@@ -832,15 +838,15 @@ namespace EncompassRest
 
         public sealed class PropertyFilter : ObjectFilter
         {
-            public string PropertyName { get; }
+            public ModelPath PropertyPath { get; }
 
             public string Value { get; }
 
-            public PropertyFilter(string propertyName, string value)
+            public PropertyFilter(ModelPath propertyPath, string value)
             {
-                Preconditions.NotNullOrEmpty(propertyName, nameof(propertyName));
+                Preconditions.NotNull(propertyPath, nameof(propertyPath));
 
-                PropertyName = propertyName;
+                PropertyPath = propertyPath;
                 Value = value;
             }
 
@@ -850,20 +856,14 @@ namespace EncompassRest
 
                 var valueType = value.GetType();
                 var contract = JsonHelper.InternalPrivateContractResolver.ResolveContract(valueType);
-                if (!(contract is JsonObjectContract objectContract))
+                if (!(contract is JsonObjectContract))
                 {
                     throw new InvalidOperationException($"value's type must resolve to a json object contract");
                 }
-                var propertyName = propertyNameTransformer?.Invoke(PropertyName) ?? PropertyName;
-                var property = objectContract.Properties.GetClosestMatchProperty(propertyName);
-                if (property == null)
-                {
-                    throw new InvalidOperationException($"Could not find property {propertyName} on {valueType}");
-                }
 
-                var retrievedValue = property.ValueProvider.GetValue(value);
+                var retrievedValue = PropertyPath.GetValue(value);
                 string? defaultValue = null;
-                if (retrievedValue == null && settings != null && settings.DefaultValues?.TryGetValue(propertyName, out defaultValue) == true)
+                if (retrievedValue == null && settings != null && settings.DefaultValues?.TryGetValue(PropertyPath.ToString(), out defaultValue) == true)
                 {
                     retrievedValue = defaultValue!;
                 }
@@ -872,7 +872,7 @@ namespace EncompassRest
 
             public override string ToString(Func<string, string>? propertyNameTransformer, bool attributePath)
             {
-                var propertyName = propertyNameTransformer?.Invoke(PropertyName) ?? PropertyName;
+                var propertyName = PropertyPath.ToString(propertyNameTransformer, attributePath);
                 var propertyNameEscaped = EscapeWithTick(propertyName, out var escapeNeeded);
                 return $"{(attributePath ? $"@/{propertyName}" : (escapeNeeded ? $"'{propertyNameEscaped}'" : propertyNameEscaped))} == {(attributePath ? "\"" : "'")}{EscapeWithTick(Value, out _)}{(attributePath ? "\"" : "'")}";
             }

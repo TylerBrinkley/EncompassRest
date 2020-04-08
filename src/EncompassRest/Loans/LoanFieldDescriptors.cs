@@ -597,7 +597,7 @@ namespace EncompassRest.Loans
 
             try
             {
-                var path = new ModelPath(s_modelPathContext, modelPath);
+                var path = new ModelPath(s_modelPathContext, modelPath, includesRootObjectName: true);
                 if (string.Equals(path.RootObjectName, "Loan", StringComparison.OrdinalIgnoreCase))
                 {
                     return path;
