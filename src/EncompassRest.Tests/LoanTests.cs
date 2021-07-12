@@ -26,7 +26,7 @@ namespace EncompassRest.Tests
         {
             var client = await GetTestClientAsync();
             var supportedEntities = await client.Loans.GetSupportedEntitiesAsync();
-            AssertNoUndefinedEnumOptions(supportedEntities, "SupportedEntities", new Dictionary<Type, HashSet<string>> { { typeof(LoanEntity), new HashSet<string>(new[] { "CoBorrower", "LOCompensation", "GffVAlertTriggerFieldLog", "ConditionLog", "EntityRef" }, StringComparer.OrdinalIgnoreCase) } });
+            AssertNoUndefinedEnumOptions(supportedEntities, "SupportedEntities", new Dictionary<Type, HashSet<string>> { { typeof(LoanEntity), new HashSet<string>(new[] { "CoBorrower", "LOCompensation", "GffVAlertTriggerFieldLog", "ConditionLog", "EntityRef", "ElliUCD" }, StringComparer.OrdinalIgnoreCase) } });
         }
 
         [TestMethod]
@@ -1281,7 +1281,7 @@ namespace EncompassRest.Tests
             try
             {
                 const int patternCount = 10;
-                var fieldPatternMappings = LoanFieldDescriptors.FieldPatternMappings.Where(p => !p.Key.StartsWith("TQL4506T") && !p.Key.StartsWith("LP") && !p.Key.StartsWith("CX.") && !p.Key.StartsWith("FBE") && !p.Key.StartsWith("FCE") && !p.Key.StartsWith("XCOC") && !p.Key.StartsWith("CUST") && !p.Key.StartsWith("DD") && !p.Key.StartsWith("URLAROIS") && !p.Key.StartsWith("URLARGG") && !p.Key.StartsWith("URLAROA") && !p.Key.StartsWith("URLAROL") && !p.Key.StartsWith("HHI") && !p.Key.StartsWith("DOCPROV") && !p.Key.StartsWith("HTD") && !p.Key.StartsWith("URLARAL")).ToList();
+                var fieldPatternMappings = LoanFieldDescriptors.FieldPatternMappings.Where(p => !p.Key.StartsWith("TQL4506T") && !p.Key.StartsWith("LP") && !p.Key.StartsWith("CX.") && !p.Key.StartsWith("FBE") && !p.Key.StartsWith("FCE") && !p.Key.StartsWith("XCOC") && !p.Key.StartsWith("CUST") && !p.Key.StartsWith("DD") && !p.Key.StartsWith("URLAROIS") && !p.Key.StartsWith("URLARGG") && !p.Key.StartsWith("URLAROA") && !p.Key.StartsWith("URLAROL") && !p.Key.StartsWith("HHI") && !p.Key.StartsWith("DOCPROV") && !p.Key.StartsWith("HTD") && !p.Key.StartsWith("URLARAL") && !p.Key.StartsWith("BR") && !p.Key.StartsWith("CR")).ToList();
                 foreach (var pair in fieldPatternMappings)
                 {
                     var fieldPattern = pair.Key;
@@ -1586,7 +1586,7 @@ namespace EncompassRest.Tests
             field = loan.Fields["HMDA.X45"];
             options = field.Descriptor.Options;
             attribute = typeof(Hmda).GetTypeInfo().GetProperty(nameof(Hmda.AUS2)).GetCustomAttribute<LoanFieldPropertyAttribute>();
-            Assert.AreEqual(3, attribute.MissingOptions.Count);
+            Assert.AreEqual(2, attribute.MissingOptions.Count);
             Assert.AreEqual(members.Count - attribute.MissingOptions.Count, options.Count);
             foreach (var member in members)
             {
